@@ -1,0 +1,13 @@
+# Normaliza fim de linha entre Linux e Windows
+* text=auto
+*.py   text eol=lf
+*.md   text
+*.yml  text eol=lf
+*.toml text eol=lf
+*.sh   text eol=lf
+*.bat  text eol=crlf
+
+# Binarios (nao diferenciar/converter)
+*.xlsx binary
+*.npy  binary
+*.zip  binary

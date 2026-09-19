@@ -1,4 +1,4 @@
-name: pi-autopecas
+name: garimpo-autopecas
 channels:
   - conda-forge
   - nodefaults

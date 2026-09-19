@@ -1,4 +1,6 @@
-# PI V — Busca híbrida offline para catálogo de autopeças (Fatec Cotia)
+# Garimpo — busca híbrida offline de autopeças para carros antigos
+
+Projeto Integrador V — Fatec Cotia (Ciência de Dados).
 
 Sistema 100% local (sem chave de API, sem enviar dados à internet) que encontra peças
 no catálogo de 13 fornecedores (8.802 linhas) por texto + embeddings + filtros e, numa
@@ -35,24 +37,53 @@ resultados/              relatorio_qualidade.md e avaliacao.csv (gerados)
 
 ```bash
 conda env create -f environment.yml
-conda activate pi-autopecas
+conda activate garimpo-autopecas     # o nome vem do campo `name:` do environment.yml
 pip install -e .
-pytest                      # 12 testes devem passar
+pytest                               # 12 testes devem passar
 ```
+
+Confirme que o ambiente está ativo antes do `pip`: o prompt deve mostrar `(garimpo-autopecas)` e
+`which python` (Windows: `where python`) deve apontar para dentro de `envs/garimpo-autopecas`.
+No VS Code: `Ctrl+Shift+P` → *Python: Select Interpreter* → `garimpo-autopecas`.
 
 ## Uso
 
+Linux / macOS:
 ```bash
 cp /caminho/BD_Proj_Integrador_5CD.xlsx data/raw/
 python scripts/01_preparar_dados.py                  # gera catalogo.csv e o relatório de qualidade
 python scripts/02_avaliar.py --retriever lexical     # baseline sem IA
-# depois de instalar o Ollama (docs/GUIA_OLLAMA.md):
-ollama pull all-minilm && ollama pull bge-m3
+```
+
+Windows (Anaconda Prompt ou PowerShell):
+```bat
+copy C:\caminho\BD_Proj_Integrador_5CD.xlsx data\raw\
+python scripts\01_preparar_dados.py
+python scripts\02_avaliar.py --retriever lexical
+```
+
+Depois de instalar o Ollama (`docs/GUIA_OLLAMA.md`; no Windows use o instalador de ollama.com/download):
+```bash
+ollama pull all-minilm
+ollama pull bge-m3
 python scripts/02_avaliar.py --retriever ollama --modelo all-minilm
 python scripts/02_avaliar.py --retriever ollama --modelo bge-m3
 ```
 
 Cada execução acrescenta linhas em `resultados/avaliacao.csv` (tabela pronta para o relatório).
+
+## Problemas comuns
+
+| Mensagem | Causa | Solução |
+|---|---|---|
+| `EnvironmentNameNotFound` | o nome no `conda activate` não é o do campo `name:` do `environment.yml` | ative com o nome correto (`conda env list` mostra os existentes) |
+| `externally-managed-environment` no `pip` | o ambiente conda não estava ativo e o `pip` era o do sistema | ative o ambiente e confira com `which python`; **não** use `--break-system-packages` |
+| `ModuleNotFoundError: autopecas` | falta `pip install -e .` (ou interpretador errado no VS Code) | rode `pip install -e .` dentro do ambiente |
+
+## Dados sigilosos
+
+O repositório é **privado** e os dados da empresa nunca vão para o Git: `data/raw/`, `data/processed/`
+e `resultados/` estão no `.gitignore`. Confira com `git ls-files data resultados` (só deve listar `.gitkeep`).
 
 ## Atenção: o nível Básico não tem gabarito por GTIN
 
