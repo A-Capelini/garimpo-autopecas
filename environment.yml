@@ -1,0 +1,14 @@
+name: pi-autopecas
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - pandas
+  - numpy
+  - scikit-learn
+  - openpyxl
+  - requests
+  - streamlit
+  - pytest
