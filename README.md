@@ -39,7 +39,7 @@ resultados/              relatorio_qualidade.md e avaliacao.csv (gerados)
 conda env create -f environment.yml
 conda activate garimpo-autopecas     # o nome vem do campo `name:` do environment.yml
 pip install -e .
-pytest                               # 12 testes devem passar
+pytest                               # 39 testes devem passar (12 do motor + 27 do codigo herdado)
 ```
 
 Confirme que o ambiente está ativo antes do `pip`: o prompt deve mostrar `(garimpo-autopecas)` e
@@ -79,6 +79,17 @@ Cada execução acrescenta linhas em `resultados/avaliacao.csv` (tabela pronta p
 | `EnvironmentNameNotFound` | o nome no `conda activate` não é o do campo `name:` do `environment.yml` | ative com o nome correto (`conda env list` mostra os existentes) |
 | `externally-managed-environment` no `pip` | o ambiente conda não estava ativo e o `pip` era o do sistema | ative o ambiente e confira com `which python`; **não** use `--break-system-packages` |
 | `ModuleNotFoundError: autopecas` | falta `pip install -e .` (ou interpretador errado no VS Code) | rode `pip install -e .` dentro do ambiente |
+
+## Código herdado (em consolidação)
+
+O histórico do repositório de um integrante do grupo (`github.com/VicktzZ/garimpo`, 4 commits) foi
+mesclado aqui em 06/11/2026. Esse código está na raiz: `garimpo/` (pacote), `app.py` (interface
+Streamlit), `requirements.txt`, `.streamlit/` e, em `scripts/`, `preparar_dados.py`, `avaliar.py` e
+`comparar_embeddings.py`. Os 27 testes dele estão em `tests/` (`test_avaliacao.py`, `test_banco.py`,
+`test_busca.py`, `test_dados.py`, `test_embeddings.py`, `test_lexical.py`, `test_semantica.py`).
+
+O motor de referência é `src/autopecas/`. O código herdado **ainda não foi consolidado** nele:
+as duas estruturas convivem até a Etapa 1, e a raiz está no `pythonpath` do pytest só por causa disso.
 
 ## Dados sigilosos
 
