@@ -44,7 +44,7 @@ conda env create -f environment.yml
 conda activate garimpo-autopecas     # nome vem do campo `name:` do environment.yml
 which python                         # deve apontar para dentro de envs/garimpo-autopecas
 pip install -e .
-pytest                               # 125 testes (Etapa 2); 1 arquivo é ignorado sem Streamlit
+pytest                               # 98 testes (os do app exigem Streamlit, já no ambiente)
 ```
 
 O `environment.yml` é a fonte única das dependências, inclusive o Ollama (conda-forge) e
@@ -102,11 +102,12 @@ Entre os fornecedores A–D não há GTIN válido compartilhado: o gabarito Bás
 (Intermediário: 294; Avançado: 385). O Básico exige conjunto manual (30 a 50 perguntas — Etapa 3).
 As métricas só são comparáveis entre recuperadores dentro do mesmo nível.
 
-## Código herdado (a remover)
+## Independência do repositório
 
-`garimpo/`, `app.py`, `requirements.txt` e `scripts/{avaliar,comparar_embeddings,preparar_dados}.py`
-(com seus testes) vêm do repositório de um integrante e **só serão removidos depois do portão de
-independência** (`scripts/08_portao_independencia.sh`), com confirmação do grupo.
+O código que veio do repositório de um integrante (`garimpo/`, `app.py`, `requirements.txt` e três
+scripts) foi removido em 06/11/2026, depois que o **portão de independência** passou: clone limpo,
+ambiente novo, rede desligada, sem o repositório de origem (`scripts/08_portao_independencia.sh`,
+fases A e B). O histórico dele continua no Git.
 
 ## Próximos passos
 
