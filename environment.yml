@@ -5,10 +5,13 @@ channels:
 dependencies:
   - python=3.12
   - pip
-  - pandas
-  - numpy
-  - scikit-learn
-  - openpyxl
-  - requests
-  - streamlit
-  - pytest
+  - pandas=3.0.5
+  - numpy=2.5.3
+  - scikit-learn=1.9.1
+  - openpyxl=3.1.5
+  - requests=2.34.2
+  - streamlit=1.63.0
+  - pytest=9.1.1
+  - ollama=0.32.15=cpu_*
+variables:
+  OLLAMA_NO_CLOUD: "1"
