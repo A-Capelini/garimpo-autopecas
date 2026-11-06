@@ -13,6 +13,7 @@ import argparse
 
 from autopecas.config import RESULTADOS
 from autopecas.data.loader import carregar_catalogo
+from autopecas.data.quality import normalizar_texto
 from autopecas.evaluation.runner import avaliar_niveis
 from autopecas.retrieval.hybrid import HybridRetriever
 from autopecas.retrieval.lexical import TfidfRetriever
@@ -20,7 +21,7 @@ from autopecas.retrieval.ollama_embed import ErroOllama, OllamaEmbeddingRetrieve
 
 
 def criar_fabrica(args):
-    lexical = lambda: TfidfRetriever(min_df=args.min_df)
+    lexical = lambda: TfidfRetriever(min_df=args.min_df, sublinear_tf=not args.sem_sublinear)
     if args.retriever == "lexical":
         return lexical
     if not args.modelo:
@@ -51,6 +52,9 @@ def main() -> None:
     ap.add_argument("--campo", default="texto_busca", choices=["texto_busca", "descricao"],
                     help="coluna indexada (padrao: texto_busca)")
     ap.add_argument("--min-df", type=int, default=2, help="min_df do TF-IDF (padrao oficial: 2)")
+    ap.add_argument("--sem-sublinear", action="store_true", help="desliga sublinear_tf (padrao oficial: ligado)")
+    ap.add_argument("--normalizacao", choices=["oficial", "simples"], default="oficial",
+                    help="simples: todo simbolo vira espaco (como no pipeline do Vitor)")
     ap.add_argument("--metodo", choices=["rrf", "soma"], default="rrf", help="fusao do hibrido")
     ap.add_argument("--peso-lexical", type=float, default=None, help="rrf: padrao 3; soma: [0,1], padrao 0.5")
     ap.add_argument("--peso-semantico", type=float, default=1.0, help="so rrf")
@@ -59,6 +63,8 @@ def main() -> None:
     args = ap.parse_args()
 
     df = carregar_catalogo()
+    if args.normalizacao == "simples":
+        df["texto_busca"] = df["descricao"].map(lambda t: normalizar_texto(t, manter_simbolos=False))
     try:
         tabela = avaliar_niveis(df, criar_fabrica(args), coluna_texto=args.campo)
     except ErroOllama as e:

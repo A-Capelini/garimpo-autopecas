@@ -23,7 +23,7 @@ from autopecas.retrieval.ollama_embed import ErroOllama
 DECIMAIS_EMPATE = 10  # mesmo criterio de evaluation.metrics
 
 
-def _posicoes(S: np.ndarray) -> np.ndarray:
+def posicoes(S: np.ndarray) -> np.ndarray:
     """Posicao 1-based de cada documento no ranking decrescente da propria linha."""
     S = np.round(S, DECIMAIS_EMPATE)
     ordem = np.argsort(-S, axis=1, kind="stable")
@@ -33,12 +33,28 @@ def _posicoes(S: np.ndarray) -> np.ndarray:
     return pos
 
 
-def _minmax(S: np.ndarray) -> np.ndarray:
+def minmax_por_linha(S: np.ndarray) -> np.ndarray:
     fin = np.isfinite(S)
     lo = np.where(fin, S, np.inf).min(axis=1, keepdims=True)
     hi = np.where(fin, S, -np.inf).max(axis=1, keepdims=True)
     amp = np.where(hi - lo > 0, hi - lo, 1.0)
     return np.where(fin, (S - lo) / amp, 0.0)
+
+
+def fundir_rrf(pos_lex, pos_sem, peso_lexical, peso_semantico, k_rrf, profundidade) -> np.ndarray:
+    """RRF a partir das posicoes (1-based) de cada fonte; fora do top-`profundidade` vale 0."""
+    fundido = np.zeros(pos_lex.shape, dtype=np.float64)
+    for pos, w in ((pos_lex, peso_lexical), (pos_sem, peso_semantico)):
+        contrib = w / (k_rrf + pos)
+        if profundidade:
+            contrib = np.where(pos <= profundidade, contrib, 0.0)
+        fundido += contrib
+    return fundido
+
+
+def fundir_soma(S_lex, S_sem, peso_lexical) -> np.ndarray:
+    """Soma ponderada de scores min-max por consulta (entradas nao finitas valem 0)."""
+    return peso_lexical * minmax_por_linha(S_lex) + (1.0 - peso_lexical) * minmax_por_linha(S_sem)
 
 
 class HybridRetriever:
@@ -88,16 +104,10 @@ class HybridRetriever:
     # ---------- fusao ----------
     def _fundir(self, Sl: np.ndarray, Ss: np.ndarray) -> np.ndarray:
         if self.metodo == "soma":
-            w = self.peso_lexical
-            return w * _minmax(Sl) + (1.0 - w) * _minmax(Ss)
-        fundido = np.zeros_like(Sl, dtype=np.float64)
-        for S, w in ((Sl, self.peso_lexical), (Ss, self.peso_semantico)):
-            pos = _posicoes(S)
-            contrib = w / (self.k_rrf + pos)
-            if self.profundidade:
-                contrib = np.where(pos <= self.profundidade, contrib, 0.0)
-            fundido += contrib
-        return fundido
+            return fundir_soma(Sl, Ss, self.peso_lexical)
+        return fundir_rrf(
+            posicoes(Sl), posicoes(Ss), self.peso_lexical, self.peso_semantico, self.k_rrf, self.profundidade
+        )
 
     # ---------- contrato Retriever ----------
     def score_rows(self, linhas: Sequence[int]) -> np.ndarray:
