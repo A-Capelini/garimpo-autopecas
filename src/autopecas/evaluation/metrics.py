@@ -3,6 +3,8 @@ import numpy as np
 
 from autopecas.evaluation.gold import Gold
 
+DECIMAIS_EMPATE = 10
+
 
 def avaliar(
     scores: np.ndarray,
@@ -10,22 +12,16 @@ def avaliar(
     mascara: np.ndarray | None = None,
     ks: tuple[int, ...] = (1, 5, 10),
 ) -> dict:
-    """Avalia uma matriz de scores (n_consultas x n_documentos).
-
-    - Linha i de `scores` corresponde a gold.consultas[i].
-    - A propria consulta e excluida do ranking.
-    - `mascara` (por documento) restringe o corpus (ex.: um nivel de escala).
-
-    Hit@k    : fracao de consultas com ao menos um equivalente no top-k.
-    Recall@k : media da fracao dos equivalentes encontrados no top-k.
-    MRR      : media de 1 / (posicao do primeiro equivalente).
-    """
+    """Avalia uma matriz de scores (n_consultas x n_documentos)."""
     n_q = scores.shape[0]
     if n_q == 0:
         return {"n_consultas": 0, "mrr": float("nan"), **{f"hit@{k}": float("nan") for k in ks},
                 **{f"recall@{k}": float("nan") for k in ks}}
 
-    s = scores.astype(np.float64, copy=True)
+    # Arredonda para que empates reais (descricoes repetidas -> vetores identicos) nao sejam
+    # desfeitos por ruido de ponto flutuante (~1e-16); o desempate passa a ser a posicao
+    # (argsort estavel), igual para qualquer formato de matriz.
+    s = np.round(scores.astype(np.float64), DECIMAIS_EMPATE)
     if mascara is not None:
         s[:, ~mascara] = -np.inf
     s[np.arange(n_q), gold.consultas] = -np.inf

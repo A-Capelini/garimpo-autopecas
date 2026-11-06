@@ -12,6 +12,8 @@ from __future__ import annotations
 import hashlib
 import os
 import sqlite3
+import sys
+import time
 from pathlib import Path
 from typing import Sequence
 
@@ -42,6 +44,10 @@ def _hash(texto: str) -> str:
 
 
 class OllamaEmbeddingRetriever:
+    # O cosseno entre dois vetores nao depende do resto do corpus: indexa-se o catalogo
+    # inteiro uma vez e a avaliacao por nivel apenas fatia.
+    corpus_dependente = False
+
     def __init__(
         self,
         modelo: str,
@@ -125,7 +131,7 @@ class OllamaEmbeddingRetriever:
         return resp.json()["embeddings"]
 
     # ---------- embeddings ----------
-    def _embed(self, textos: Sequence[str]) -> np.ndarray:
+    def _embed(self, textos: Sequence[str], progresso: bool = False) -> np.ndarray:
         """Vetores unitarios, na ordem de entrada. Usa o cache por texto."""
         textos = list(textos)
         if not textos:
@@ -138,6 +144,9 @@ class OllamaEmbeddingRetriever:
             if h not in achados and h not in faltam:
                 faltam[h] = t
         itens = list(faltam.items())
+        t0 = time.time()
+        if progresso and itens:
+            print(f"[{self.nome}] {len(achados)} em cache, {len(itens)} a calcular", file=sys.stderr)
         for i in range(0, len(itens), self.lote):
             parte = itens[i : i + self.lote]
             vetores = self._post_embed([t for _, t in parte])
@@ -150,11 +159,15 @@ class OllamaEmbeddingRetriever:
                 novos.append((h, v))
             if self.usar_cache:
                 self._gravar_cache(novos)  # grava por lote: queda no meio nao perde tudo
+            if progresso and (i // self.lote) % 50 == 0:
+                feito = min(i + self.lote, len(itens))
+                print(f"[{self.nome}] {feito}/{len(itens)} ({time.time() - t0:.0f}s)", file=sys.stderr)
         return np.vstack([achados[h] for h in hashes]).astype(np.float32)
 
     # ---------- contrato Retriever ----------
     def fit(self, textos: Sequence[str]) -> "OllamaEmbeddingRetriever":
-        self._E = self._embed([self.prefixo_documento + t for t in textos])
+        # float64 nos scores: reduz o ruido numerico que desfaz empates entre vetores identicos
+        self._E = self._embed([self.prefixo_documento + t for t in textos], progresso=True).astype(np.float64)
         return self
 
     def score_rows(self, linhas: Sequence[int]) -> np.ndarray:
@@ -163,7 +176,7 @@ class OllamaEmbeddingRetriever:
 
     def score_texts(self, consultas: Sequence[str]) -> np.ndarray:
         assert self._E is not None, "chame fit() antes"
-        Q = self._embed([self.prefixo_consulta + c for c in consultas])
+        Q = self._embed([self.prefixo_consulta + c for c in consultas]).astype(np.float64)
         return Q @ self._E.T
 
     def fechar(self) -> None:

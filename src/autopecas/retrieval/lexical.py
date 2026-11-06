@@ -7,10 +7,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 class TfidfRetriever:
     nome = "tfidf-char"
+    # O IDF depende do corpus: a avaliacao por nivel reajusta o indice em cada nivel.
+    corpus_dependente = True
 
-    def __init__(self, ngram_range=(3, 5), min_df=2):
+    def __init__(self, ngram_range=(3, 5), min_df=2, sublinear_tf=True, analyzer="char_wb"):
         self._vec = TfidfVectorizer(
-            analyzer="char_wb", ngram_range=ngram_range, min_df=min_df, sublinear_tf=True
+            analyzer=analyzer, ngram_range=ngram_range, min_df=min_df, sublinear_tf=sublinear_tf
         )
         self._X = None
 
