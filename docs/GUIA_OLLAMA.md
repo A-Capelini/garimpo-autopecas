@@ -1,69 +1,65 @@
-# Guia rápido do Ollama (Ubuntu, CPU)
+# Guia rápido do Ollama neste projeto
 
 ## O que é
-O Ollama roda como um **servidor local** (porta `11434`) que carrega modelos de linguagem e de
-embeddings **quantizados** (formato GGUF, motor llama.cpp) e os expõe por uma API HTTP.
-Nosso código Python fala com ele por `requests` (ver `retrieval/ollama_embed.py`).
-Baixar um modelo (`ollama pull`) precisa de internet **uma vez**; depois disso tudo roda offline.
+Servidor local (porta `11434`) que roda modelos quantizados (GGUF, llama.cpp) e os expõe por HTTP.
+O código fala com ele por `requests` (`retrieval/ollama_embed.py`). Baixar um modelo
+(`ollama pull`) precisa de internet **uma vez**; depois tudo roda offline.
 
-## 1. Instalar
-Confira o comando atual em https://ollama.com/download (pode mudar). Em Linux, o instalador oficial é:
-
+## 1. Instalar (dentro do ambiente conda do projeto)
+O Ollama já vem no `environment.yml` (conda-forge, build `cpu_*`). Não instale por `snap` nem
+por `curl | sh`.
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
-systemctl status ollama        # deve estar "active (running)"
+conda activate garimpo-autopecas
+which ollama                     # deve estar dentro de envs/garimpo-autopecas
 ollama --version
 ```
+O `environment.yml` define `OLLAMA_NO_CLOUD=1`, que desliga os recursos de nuvem.
 
-## 2. Comandos essenciais
+## 2. Subir e conferir o servidor
 ```bash
-ollama pull bge-m3             # baixa um modelo
-ollama list                    # modelos instalados e tamanho em disco
-ollama run gemma3:1b --verbose # conversa no terminal; --verbose mostra tokens/s ao final
-ollama ps                      # o que está carregado na memória agora
-ollama rm <modelo>             # apaga um modelo
+ollama serve 2>&1 | tee /tmp/ollama_serve.log      # terminal dedicado; Ctrl+C para parar
+curl -s http://127.0.0.1:11434/api/tags            # lista os modelos instalados
+pkill -f "ollama serve"                            # parar de outro terminal
 ```
-Sair do chat: `/bye`.
+`address already in use` significa que já há um servidor rodando — é só usá-lo.
 
-## 3. Regras do projeto (governança)
-- Use **somente modelos locais**. Não use tags terminadas em `-cloud` e não faça login no Ollama:
-  isso enviaria dados para fora e violaria o requisito de 100% offline.
-- Prova de soberania para a banca: depois de baixar os modelos, **desligue a rede** e rode o sistema.
-
-## 4. Modelos para testar neste PC (i5-4690K, 16 GB RAM, sem GPU)
-Confira nomes e tags em https://ollama.com/library antes de baixar.
-
-| Uso | Candidatos | Observação |
-|---|---|---|
-| Embeddings | `all-minilm` (23M, modelo em inglês) · `paraphrase-multilingual` · `embeddinggemma` · `bge-m3` (568M, multilíngue) | testar todos no gabarito; a indexação é feita uma vez |
-| LLM (explicação) | `gemma3:1b` → `qwen3:1.7b` → `llama3.2:3b` → `gemma3:4b` | começar pelo menor e subir só se o português ficar ruim |
-
-Meça a velocidade real de cada LLM com `ollama run <modelo> --verbose` (linha `eval rate`).
-Modelos com modo de raciocínio (como o Qwen 3) gastam tokens "pensando"; há opção para desligar —
-veja `ollama run --help`.
-
-## 5. Expectativa de desempenho
-Este processador (Haswell, 4 threads, memória DDR3) é bem mais lento que o de um PC atual.
-Planeje respostas de **vários segundos** e mantenha o prompt curto (poucas linhas recuperadas,
-texto enxuto). Por isso o LLM é **opcional** no projeto: a busca funciona sem ele.
-Não rode outras tarefas pesadas durante as medições.
-
-## 6. Testar a API na mão
+## 3. Comandos essenciais
 ```bash
-curl http://localhost:11434/api/embed -d '{"model":"bge-m3","input":["pastilha de freio opala"]}'
-curl http://localhost:11434/api/generate -d '{"model":"gemma3:1b","prompt":"Diga oi","stream":false}'
+ollama pull bge-m3     # baixa o modelo de embeddings (internet, uma vez)
+ollama list            # modelos e tamanho em disco
+ollama ps              # o que está na memória agora
+ollama rm <modelo>     # apaga
+```
+
+## 4. Regras do projeto
+- Somente modelos locais. Nada de tags `-cloud` e nada de `ollama signin`/login.
+- Prova de soberania: depois de baixar os modelos, **desligue a rede** e rode o app.
+
+## 5. Modelos
+| Uso | Modelo | Situação |
+|---|---|---|
+| Embeddings | `bge-m3` (568M, multilíngue) | decidido; vetores guardados em `data/catalogo.db` |
+| LLM (explicação) | candidatos `gemma3:1b`, `qwen3:1.7b`, `llama3.2:3b`, `gemma3:4b` | Etapa 5, ainda não escolhido; confira nomes em https://ollama.com/library |
+
+## 6. Desempenho (i5-4690K, 16 GB, sem GPU)
+- Indexar o catálogo inteiro com `bge-m3`: ≈10 min, uma vez. Depois, atualizar 100 itens novos
+  levou ≈8 s (82 vetores novos) — medido em `resultados/medicao_atualizacao.md`.
+- Consulta nova no app ≈ 30 ms de busca (+ ≈125 ms para vetorizar o texto da consulta na primeira vez).
+
+## 7. Vetores e cache
+Vetores ficam na tabela `embeddings_cache` do `data/catalogo.db`, chaveados por modelo + hash do
+texto. Não existe mais cache `.npy`. Importar o mesmo texto de novo não gera novo vetor.
+
+## 8. Testar a API na mão
+```bash
+curl http://127.0.0.1:11434/api/embed -d '{"model":"bge-m3","input":["pastilha de freio opala"]}'
 ```
 Use `/api/embed` (a rota `/api/embeddings` é antiga).
 
-## 7. Onde ficam os modelos
-Em instalação como serviço no Linux, normalmente em `/usr/share/ollama/.ollama/models`, na
-partição do sistema. Para usar outro disco, defina `OLLAMA_MODELS` num override do serviço
-(`sudo systemctl edit ollama`) e garanta que o usuário `ollama` tenha permissão na pasta.
-
-## 8. Problemas comuns
+## 9. Problemas comuns
 | Sintoma | O que fazer |
 |---|---|
-| `Nao consegui falar com o Ollama` | `systemctl status ollama` ou `ollama serve` |
-| `Modelo ... nao encontrado` | `ollama pull <modelo>` |
-| Primeira chamada lenta | o modelo está carregando; `keep_alive` mantém na memória |
-| Falta de memória | usar modelo menor; fechar navegador e outros programas |
+| App em "🔴 offline" | `ollama serve`; `curl .../api/tags`; `ollama list` deve mostrar `bge-m3` |
+| `Modelo ... nao encontrado` | `ollama pull bge-m3` |
+| Primeira busca lenta | modelo carregando / indexação inicial |
+| Falta de memória | feche navegador e outros programas |
