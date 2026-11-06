@@ -34,14 +34,19 @@ def classificar_gtin(gtin, codigo_interno) -> str:
     return "valido" if digito_verificador_ok(g) else "invalido"
 
 
-def normalizar_texto(texto) -> str:
-    """Texto de busca: minusculo, sem acento, sem o sufixo '-:' do fornecedor B."""
+def normalizar_texto(texto, manter_simbolos: bool = True) -> str:
+    """Texto de busca: minusculo, sem acento, sem o sufixo '-:' do fornecedor B.
+
+    manter_simbolos=True (padrao, oficial): preserva '/' e '>' (ex.: 'uno/pre 84>').
+    manter_simbolos=False: troca todo simbolo por espaco (variante usada so na ablacao).
+    """
     if pd.isna(texto):
         return ""
     s = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode("ascii")
     s = s.lower()
     s = re.sub(r"\s*-:\s*$", "", s)
-    s = re.sub(r"[^a-z0-9/>\s]", " ", s)
+    padrao = r"[^a-z0-9/>\s]" if manter_simbolos else r"[^a-z0-9\s]"
+    s = re.sub(padrao, " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
