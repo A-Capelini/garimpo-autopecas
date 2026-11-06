@@ -12,7 +12,7 @@ pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 from autopecas.store import Catalogo  # noqa: E402
-from tests.test_store_catalogo import linha  # noqa: E402
+from tests.test_store_catalogo import _Sessao, linha  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parents[1]
 HOME = str(RAIZ / "app" / "Home.py")
@@ -36,7 +36,7 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setattr(comum, "CATALOGO_DB", caminho)
     monkeypatch.setattr(search, "CATALOGO_DB", caminho)
     comum.carregar.clear()
-    comum.tentar_reconectar.clear()
+    comum.atualizar_status.clear()
     yield caminho, comum
     comum.carregar.clear()
     sys.modules.pop("comum", None)
@@ -148,3 +148,24 @@ def test_pagina_de_atualizacao_recusa_planilha_invalida(app_env, monkeypatch):
     monkeypatch.setattr(st, "file_uploader", lambda *a, **k: repetida)
     at = AppTest.from_file(PAGINA, default_timeout=60).run()
     assert any("repetem" in e.value for e in at.error)
+
+
+def test_status_offline_mesmo_com_todos_os_vetores_em_cache(app_env):
+    """Regressao (capturas de 06/11): com o cache completo, fit(), o aquecimento e consultas repetidas
+    funcionam sem o Ollama; o app mostrava 'online/hibrida' com o servidor parado."""
+    from autopecas.retrieval.ollama_embed import OllamaEmbeddingRetriever
+
+    caminho, comum = app_env
+    popular(caminho)
+    with Catalogo(caminho) as c:
+        textos = c.itens()["texto_busca"].tolist()
+    pre = OllamaEmbeddingRetriever("bge-m3", banco=caminho, sessao=_Sessao())
+    pre.fit(textos + ["aquecimento", "cabo capo uno"])  # tudo o que o app pediria ao Ollama
+    pre.fechar()
+
+    at = AppTest.from_file(HOME, default_timeout=60).run()
+    assert not at.exception
+    assert any("offline" in m.value for m in at.markdown)
+    assert not any("online" in m.value and "offline" not in m.value for m in at.markdown)
+    at.text_input(key="consulta").set_value("cabo capo uno").run()
+    assert {m.label: m.value for m in at.metric}["Modo de busca"] == "lexical"

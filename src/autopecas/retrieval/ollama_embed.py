@@ -132,6 +132,23 @@ class OllamaEmbeddingRetriever:
             )
             conn.commit()
 
+    # ---------- sonda ----------
+    def disponivel(self, timeout: float = 2.0) -> bool:
+        """O servidor responde e o modelo esta instalado? Sonda direta (GET /api/tags).
+
+        Nao usa o cache de vetores: com todos os vetores em cache, fit() e consultas repetidas
+        funcionam mesmo com o Ollama parado, entao so uma sonda diz a verdade sobre o servidor.
+        """
+        try:
+            resp = self.sessao.get(f"{self.host}/api/tags", timeout=timeout)
+            if resp.status_code != 200:
+                return False
+            nomes = [m.get("name", "") for m in resp.json().get("models", [])]
+        except Exception:  # sonda de saude: qualquer falha significa "indisponivel"
+            return False
+        base = self.modelo.split(":")[0]
+        return any(n == self.modelo or n.split(":")[0] == base for n in nomes)
+
     # ---------- HTTP ----------
     def _post_embed(self, textos: list[str]) -> list[list[float]]:
         url = f"{self.host}/api/embed"

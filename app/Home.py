@@ -7,7 +7,7 @@ from __future__ import annotations
 import streamlit as st
 
 from autopecas.search import Filtros
-from comum import aviso_catalogo_vazio, carregar, tentar_reconectar
+from comum import atualizar_status, aviso_catalogo_vazio, carregar
 
 EXEMPLOS = ["cabo capo uno", "palheta s435", "filtro oleo gol", "amortecedor dianteiro fusca"]
 
@@ -19,7 +19,7 @@ if buscador is None:
     aviso_catalogo_vazio()
     st.stop()
 
-tentar_reconectar(buscador)  # no maximo 1x por 30 s: volta ao hibrido se o Ollama reapareceu
+atualizar_status(buscador)  # sonda o Ollama (1x a cada 2 s): lexical se parou, hibrido se voltou
 
 # ---------- barra lateral ----------
 with st.sidebar:

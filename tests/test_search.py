@@ -152,3 +152,34 @@ def test_aquecer_ok_e_com_ollama_fora():
     ok = buscador()
     ok.hibrido.semantico.falhar = True  # cai entre a carga e o aquecimento
     assert ok.aquecer() is False and ok.degradado
+
+
+class SemanticoComSonda(SemanticoFalso):
+    """Como o real: o fit funciona SEM servidor (tudo em cache); so a sonda sabe se ele esta no ar."""
+
+    def __init__(self):
+        super().__init__()
+        self.no_ar = True
+
+    def disponivel(self):
+        return self.no_ar
+
+
+def test_reconectar_nao_volta_ao_hibrido_com_servidor_parado_mesmo_com_cache():
+    sem = SemanticoComSonda()
+    b = buscador(sem)
+    sem.no_ar = False
+    assert b.verificar_servidor() is False and b.degradado
+    assert b.reconectar() is False and b.degradado  # fit() teria sucesso: a sonda impede o engano
+    assert b.buscar("cabo capo uno").modo == MODO_LEXICAL
+
+
+def test_verificar_servidor_cai_e_volta():
+    sem = SemanticoComSonda()
+    b = buscador(sem)
+    assert b.verificar_servidor() is True and b.modo == MODO_HIBRIDA
+    sem.no_ar = False
+    assert b.verificar_servidor() is False and b.modo == MODO_LEXICAL
+    sem.no_ar = True
+    assert b.verificar_servidor() is True and b.modo == MODO_HIBRIDA
+    assert b.buscar("cabo capo uno").modo == MODO_HIBRIDA

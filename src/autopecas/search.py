@@ -101,16 +101,40 @@ class Buscador:
     def modo(self) -> str:
         return MODO_LEXICAL if self.degradado else MODO_HIBRIDA
 
+    def _servidor_ok(self) -> bool:
+        sonda = getattr(self.hibrido.semantico, "disponivel", None)
+        return sonda() if sonda is not None else True
+
     def reconectar(self) -> bool:
-        """Tenta voltar ao modo hibrido (Ollama de volta). True se ficou/esta hibrido."""
+        """Tenta voltar ao modo hibrido (Ollama de volta). True se ficou/esta hibrido.
+
+        Confere o servidor por sonda antes: com todos os vetores em cache o fit() teria sucesso
+        mesmo com o Ollama parado, e o buscador voltaria ao hibrido por engano.
+        """
         if not self.degradado:
             return True
+        if not self._servidor_ok():
+            return False
         try:
             self.hibrido.semantico.fit(self._textos)
         except ErroOllama:
             return False
         self.hibrido.degradado = False
         return True
+
+    def verificar_servidor(self) -> bool:
+        """Atualiza o estado conforme o servidor REAL: cai para lexical se parou, volta se voltou.
+
+        Devolve True se o buscador esta em modo hibrido depois da verificacao.
+        """
+        if not self._servidor_ok():
+            self.hibrido.degradado = True
+            return False
+        if self.degradado:
+            if not self.reconectar():
+                return False
+            self.aquecer()
+        return not self.degradado
 
     def aquecer(self) -> bool:
         """Carrega o modelo de embedding na RAM do Ollama (evita ~2 s na 1a consulta nova).
