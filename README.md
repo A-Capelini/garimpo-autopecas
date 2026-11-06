@@ -23,11 +23,13 @@ src/autopecas/
   retrieval/             lexical.py (TF-IDF) · ollama_embed.py (bge-m3 + cache) · hybrid.py (RRF)
   store/                 catalogo.py (SQLite, upsert, vetores) · medicao.py (custo de atualizar)
   search.py              Buscador: filtros, híbrida/lexical, equivalentes por GTIN
-  evaluation/            gold.py (gabarito por GTIN) · metrics.py (Hit@k, Recall@k, MRR)
+  evaluation/            gold.py (gabarito por GTIN) · metrics.py (Hit@k, Recall@k, MRR, IC95%)
+                         gabarito_texto.py + runner_texto.py (gabarito manual em texto livre)
 app/Home.py              busca, filtros, status do Ollama, equivalentes por GTIN
 app/pages/1_Atualizar_catalogo.py   envio da planilha, prévia e aplicação
-scripts/                 01 preparar · 02 avaliar · 03 ablação · 04 calibrar · 06 importar · 07 medir
+scripts/                 01 preparar · 02 avaliar · 03 ablação · 04 calibrar · 06 importar · 07 medir · 09 gabarito
 docs/GUIA_OLLAMA.md      Ollama neste projeto
+docs/GABARITO_BASICO.md  como o grupo escreve e valida o gabarito manual do Básico
 data/raw/                coloque aqui BD_Proj_Integrador_5CD.xlsx (não versionado)
 data/processed/          catalogo.csv (gerado)
 data/catalogo.db         catálogo SQLite + vetores (gerado, não versionado)
@@ -44,7 +46,7 @@ conda env create -f environment.yml
 conda activate garimpo-autopecas     # nome vem do campo `name:` do environment.yml
 which python                         # deve apontar para dentro de envs/garimpo-autopecas
 pip install -e .
-pytest                               # 98 testes (os do app exigem Streamlit, já no ambiente)
+pytest                               # 132 testes (os do app exigem Streamlit, já no ambiente)
 ```
 
 O `environment.yml` é a fonte única das dependências, inclusive o Ollama (conda-forge) e
@@ -78,7 +80,13 @@ são vetorizados. `scripts/07_medir_atualizacao.py` mede o custo (relatório em
 
 Avaliação (baseline e comparações): `python scripts/02_avaliar.py --retriever lexical`
 (ou `--retriever ollama --modelo bge-m3`). Cada execução acrescenta linhas em
-`resultados/avaliacao.csv`.
+`resultados/avaliacao.csv`. A configuração escolhida (decisões 21 a 23) é `--preset escolhido`.
+
+Gabarito manual do Básico (perguntas em texto livre; veja `docs/GABARITO_BASICO.md`):
+```bash
+python scripts/02_avaliar.py --retriever lexical --gabarito data/raw/gabarito_basico.csv --so-validar
+bash scripts/09_medicao_etapa3.sh      # léxico, bge-m3 e híbrida; resultados/avaliacao_texto.csv
+```
 
 ## Problemas comuns
 
@@ -99,8 +107,10 @@ O repositório está **público até o fim do projeto** e será tornado privado 
 ## Atenção: o nível Básico não tem gabarito por GTIN
 
 Entre os fornecedores A–D não há GTIN válido compartilhado: o gabarito Básico tem 0 consultas
-(Intermediário: 294; Avançado: 385). O Básico exige conjunto manual (30 a 50 perguntas — Etapa 3).
-As métricas só são comparáveis entre recuperadores dentro do mesmo nível.
+(Intermediário: 294; Avançado: 385). O Básico usa um **gabarito manual** (30 a 50 perguntas em texto
+livre, feito pelo grupo; `docs/GABARITO_BASICO.md`), que fica fora do Git. As métricas só são
+comparáveis entre recuperadores dentro do mesmo nível e do mesmo tipo de gabarito (itens como
+consulta × perguntas em texto livre).
 
 ## Independência do repositório
 
@@ -111,5 +121,5 @@ fases A e B). O histórico dele continua no Git.
 
 ## Próximos passos
 
-Etapa 3: gabarito Básico manual · Etapa 4: modo Adaptações (veículo/ano) · Etapa 5: LLM local
+Etapa 3: gabarito Básico manual (código pronto; falta o grupo escrever as perguntas) · Etapa 4: modo Adaptações (veículo/ano) · Etapa 5: LLM local
 para explicar o resultado · Etapa 6: avaliação final e relatório. P2: 18/11/2026.

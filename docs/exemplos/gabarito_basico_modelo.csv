@@ -1,0 +1,4 @@
+id;pergunta;pecas;tipo;autor;observacao
+Q01;cabo do capô do gol;A:000001;direta;Fulano;EXEMPLO FICTÍCIO: códigos inventados. Apague estas linhas e use peças reais do Básico
+Q02;embreagem do fiesta;B:000002|C:000003;coloquial;Beltrano;duas peças servem: separe com |
+Q03;pastilha de freio de moto;;sem_resposta;Ciclano;não existe no Básico: peças vazio
