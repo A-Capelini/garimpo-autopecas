@@ -1,6 +1,6 @@
 # Garimpo — busca híbrida offline de autopeças para carros antigos
 
-Projeto Integrador V — Fatec Cotia (Ciência de Dados).
+Projeto Integrador IV — Fatec Cotia (Ciência de Dados).
 
 Sistema 100% local (sem chave de API, sem enviar dados à internet) que encontra peças
 no catálogo de 13 fornecedores (8.802 linhas) por texto + embeddings + filtros e, numa

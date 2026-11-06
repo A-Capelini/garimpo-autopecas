@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autopecas"
 version = "0.1.0"
-description = "Garimpo - busca hibrida offline de autopecas para carros antigos (PI V, Fatec Cotia)"
+description = "Garimpo - busca hibrida offline de autopecas para carros antigos (PI IV, Fatec Cotia)"
 requires-python = ">=3.11"
 dependencies = []
 
