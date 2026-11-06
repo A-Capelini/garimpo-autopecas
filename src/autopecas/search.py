@@ -112,6 +112,21 @@ class Buscador:
         self.hibrido.degradado = False
         return True
 
+    def aquecer(self) -> bool:
+        """Carrega o modelo de embedding na RAM do Ollama (evita ~2 s na 1a consulta nova).
+
+        Necessario porque, com todos os vetores em cache, a carga nao chama o Ollama.
+        Devolve False (e passa a lexical) se o Ollama nao responder.
+        """
+        if self.degradado:
+            return False
+        try:
+            self.hibrido.semantico.score_texts(["aquecimento"])
+        except ErroOllama:
+            self.hibrido.degradado = True
+            return False
+        return True
+
     # ---------- busca ----------
     def buscar(self, consulta: str, k: int = 20, filtros: Filtros | None = None) -> Resultado:
         inicio = time.perf_counter()

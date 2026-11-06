@@ -232,3 +232,15 @@ def test_remover_vetores(tmp_path):
         assert c.remover_vetores("m", [h, "inexistente"]) == 1
         assert c.contar_vetores("m") == 1
         emb.fechar()
+
+
+def test_simular_devolve_o_mesmo_relatorio_sem_gravar(cat):
+    cat.importar(df_de(linha("A", "1", "cabo", 10.0), linha("A", "2", "palheta")))
+    nova = df_de(linha("A", "1", "cabo", 12.0), linha("A", "3", "filtro"))
+    antes = cat.itens().copy()
+    previa = cat.importar(nova, sincronizar=True, simular=True)
+    assert cat.contar() == {"ativos": 2, "inativos": 0}
+    pd.testing.assert_frame_equal(cat.itens(), antes)
+    real = cat.importar(nova, sincronizar=True)
+    assert previa == real
+    assert (real.inseridos, real.precos_alterados, real.desativados) == (1, 1, 1)

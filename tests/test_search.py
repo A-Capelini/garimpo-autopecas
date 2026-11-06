@@ -139,3 +139,16 @@ def test_criar_com_sessao_falsa_e_vetores_no_mesmo_banco(tmp_path):
     b = Buscador.criar(catalogo(), banco=tmp_path / "catalogo.db", sessao=_Sessao())
     assert b.modo == MODO_HIBRIDA
     assert len(b.buscar("filtro oleo gol")) > 0
+
+
+def test_aquecer_ok_e_com_ollama_fora():
+    assert buscador().aquecer() is True
+    sem = SemanticoFalso(falhar=True)
+    b = buscador(sem)
+    assert b.aquecer() is False and b.degradado
+    sem.falhar = False
+    assert b.reconectar() and b.aquecer() is True
+
+    ok = buscador()
+    ok.hibrido.semantico.falhar = True  # cai entre a carga e o aquecimento
+    assert ok.aquecer() is False and ok.degradado

@@ -144,12 +144,16 @@ class Catalogo:
         ).fetchone()[0]
 
     # ---------- escrita ----------
-    def importar(self, df: pd.DataFrame, sincronizar: bool = False) -> RelatorioImportacao:
+    def importar(
+        self, df: pd.DataFrame, sincronizar: bool = False, simular: bool = False
+    ) -> RelatorioImportacao:
         """Upsert por (fornecedor, codigo_interno). Tudo numa transacao: falhou, nada muda.
 
         sincronizar=True: itens ativos dos fornecedores presentes em `df` que nao estao em `df`
         passam a inativos (a planilha e tratada como o estoque completo desses fornecedores).
         Fornecedores ausentes de `df` nao sao tocados.
+
+        simular=True: calcula e devolve o relatorio sem gravar nada (pre-visualizacao no app).
         """
         self._validar(df)
         agora = self._agora()
@@ -203,6 +207,21 @@ class Catalogo:
                 if ativo == 1 and f in fornecedores and (f, c) not in entrada
             ]
 
+        if not simular:
+            self._gravar(inserir, atualizar, desativar)
+
+        return RelatorioImportacao(
+            inseridos=len(inserir),
+            atualizados=mudados,
+            inalterados=inalterados,
+            reativados=reativados,
+            desativados=len(desativar),
+            precos_alterados=precos,
+            textos_novos=len(textos_novos - textos_existentes),
+        )
+
+    def _gravar(self, inserir: list, atualizar: list, desativar: list) -> None:
+        cols = ", ".join(_PAYLOAD)
         with self._conn:  # BEGIN ... COMMIT (ROLLBACK se der excecao)
             self._conn.executemany(
                 f"INSERT INTO itens (fornecedor, codigo_interno, {cols}, ativo, criado_em, atualizado_em) "
@@ -218,16 +237,6 @@ class Catalogo:
                 "UPDATE itens SET ativo = 0, atualizado_em = ? WHERE fornecedor = ? AND codigo_interno = ?",
                 desativar,
             )
-
-        return RelatorioImportacao(
-            inseridos=len(inserir),
-            atualizados=mudados,
-            inalterados=inalterados,
-            reativados=reativados,
-            desativados=len(desativar),
-            precos_alterados=precos,
-            textos_novos=len(textos_novos - textos_existentes),
-        )
 
     def remover_vetores(self, modelo: str, hashes: list[str]) -> int:
         """Apaga vetores do cache (por modelo e hash). Devolve quantos foram removidos."""
