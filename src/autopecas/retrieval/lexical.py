@@ -9,12 +9,12 @@ class TfidfRetriever:
     # O IDF depende do corpus: a avaliacao por nivel reajusta o indice em cada nivel.
     corpus_dependente = True
 
-    def __init__(self, ngram_range=(3, 5), min_df=2, sublinear_tf=True, analyzer="char_wb"):
+    def __init__(self, ngram_range=(3, 5), min_df=1, sublinear_tf=True, analyzer="char_wb"):
         self._vec = TfidfVectorizer(
             analyzer=analyzer, ngram_range=ngram_range, min_df=min_df, sublinear_tf=sublinear_tf
         )
         self._X = None
-        padrao = (tuple(ngram_range) == (3, 5) and min_df == 2 and sublinear_tf and analyzer == "char_wb")
+        padrao = (tuple(ngram_range) == (3, 5) and min_df == 1 and sublinear_tf and analyzer == "char_wb")
         # Nome distinto para configuracoes nao padrao: as linhas do avaliacao.csv ficam rastreaveis.
         self.nome = "tfidf-char" if padrao else f"tfidf-char[min_df={min_df},sublinear={sublinear_tf}]"
 

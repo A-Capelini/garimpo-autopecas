@@ -51,10 +51,11 @@ def main() -> None:
     ap.add_argument("--prefixo-consulta", default="", help="prefixo das consultas (modelos e5/nomic)")
     ap.add_argument("--campo", default="texto_busca", choices=["texto_busca", "descricao"],
                     help="coluna indexada (padrao: texto_busca)")
-    ap.add_argument("--min-df", type=int, default=2, help="min_df do TF-IDF (padrao oficial: 2)")
-    ap.add_argument("--sem-sublinear", action="store_true", help="desliga sublinear_tf (padrao oficial: ligado)")
-    ap.add_argument("--normalizacao", choices=["oficial", "simples"], default="oficial",
-                    help="simples: todo simbolo vira espaco (como no pipeline do Vitor)")
+    ap.add_argument("--min-df", type=int, default=1, help="min_df do TF-IDF (padrao: 1)")
+    ap.add_argument("--sem-sublinear", action="store_true", help="desliga sublinear_tf (padrao: ligado)")
+    ap.add_argument("--normalizacao", choices=["oficial", "simples"], default="simples",
+                    help="simples (padrao, decisao da Etapa 1): todo simbolo vira espaco; "
+                         "oficial: mantem '/' e '>' (padrao anterior)")
     ap.add_argument("--metodo", choices=["rrf", "soma"], default="rrf", help="fusao do hibrido")
     ap.add_argument("--peso-lexical", type=float, default=None, help="rrf: padrao 3; soma: [0,1], padrao 0.5")
     ap.add_argument("--peso-semantico", type=float, default=1.0, help="so rrf")
@@ -63,12 +64,15 @@ def main() -> None:
     args = ap.parse_args()
 
     df = carregar_catalogo()
-    if args.normalizacao == "simples":
-        df["texto_busca"] = df["descricao"].map(lambda t: normalizar_texto(t, manter_simbolos=False))
+    # Sempre recalculado a partir da descricao: a avaliacao nao depende do catalogo.csv.
+    manter = args.normalizacao == "oficial"
+    df["texto_busca"] = df["descricao"].map(lambda t: normalizar_texto(t, manter_simbolos=manter))
     try:
         tabela = avaliar_niveis(df, criar_fabrica(args), coluna_texto=args.campo)
     except ErroOllama as e:
         raise SystemExit(f"\nERRO: {e}")
+    tabela.insert(1, "normalizacao", args.normalizacao)
+    tabela.insert(2, "campo", args.campo)
     print(tabela.round(3).to_string(index=False))
 
     RESULTADOS.mkdir(parents=True, exist_ok=True)

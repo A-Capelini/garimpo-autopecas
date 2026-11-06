@@ -13,6 +13,11 @@ STATUS_GTIN = (
 )
 
 
+# Decisao da Etapa 1 (ablacao + calibracao por GTIN, 06/11/2026): no texto de busca todo simbolo
+# vira espaco (False). O padrao anterior mantinha '/' e '>' (True). Reverter = trocar aqui.
+MANTER_SIMBOLOS_NO_TEXTO_BUSCA = False
+
+
 def digito_verificador_ok(gtin: str) -> bool:
     """Valida o digito verificador GS1 (GTIN-8/12/13/14)."""
     if not gtin.isdigit() or len(gtin) not in (8, 12, 13, 14):
@@ -55,7 +60,9 @@ def aplicar_qualidade(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["gtin_status"] = [classificar_gtin(g, c) for g, c in zip(out["gtin"], out["codigo_interno"])]
     out["gtin_chave"] = out["gtin"].where(out["gtin_status"] == "valido")
-    out["texto_busca"] = out["descricao"].map(normalizar_texto)
+    out["texto_busca"] = out["descricao"].map(
+        lambda t: normalizar_texto(t, manter_simbolos=MANTER_SIMBOLOS_NO_TEXTO_BUSCA)
+    )
     out["preco_zero"] = out["preco"].fillna(0) <= 0
     return out
 
