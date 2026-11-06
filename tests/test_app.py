@@ -12,7 +12,7 @@ pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 from autopecas.store import Catalogo  # noqa: E402
-from tests.test_store_catalogo import _Sessao, linha  # noqa: E402
+from helpers import _Sessao, linha  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parents[1]
 HOME = str(RAIZ / "app" / "Home.py")

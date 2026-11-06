@@ -8,7 +8,7 @@ from autopecas.retrieval.ollama_embed import ErroOllama
 from autopecas.search import (
     Buscador, Filtros, MODO_HIBRIDA, MODO_LEXICAL, equivalentes_por_gtin,
 )
-from tests.test_store_catalogo import _Sessao, linha
+from helpers import _Sessao, linha
 
 
 class SemanticoFalso:

@@ -3,7 +3,7 @@ import pandas as pd
 
 from autopecas.config import RESULTADOS  # noqa: F401  (garante que o pacote importa)
 from autopecas.store.medicao import formatar_markdown, medir_atualizacao
-from tests.test_store_catalogo import _Sessao, linha
+from helpers import _Sessao, linha
 
 
 def catalogo_sintetico(n: int) -> pd.DataFrame:
