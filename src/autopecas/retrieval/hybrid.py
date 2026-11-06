@@ -109,6 +109,10 @@ class HybridRetriever:
             posicoes(Sl), posicoes(Ss), self.peso_lexical, self.peso_semantico, self.k_rrf, self.profundidade
         )
 
+    def fundir(self, Sl: np.ndarray, Ss: np.ndarray) -> np.ndarray:
+        """Funde matrizes de scores (consultas x documentos) de cada fonte; uso pelo Buscador."""
+        return self._fundir(np.asarray(Sl, dtype=np.float64), np.asarray(Ss, dtype=np.float64))
+
     # ---------- contrato Retriever ----------
     def score_rows(self, linhas: Sequence[int]) -> np.ndarray:
         linhas = np.asarray(list(linhas), dtype=int)
