@@ -18,3 +18,17 @@ def test_diferenca_real_ainda_ordena():
     gold = Gold(np.array([0]), (np.array([2]),))
     s = np.array([[1.0, 0.5, 0.5001, 0.1]])
     assert avaliar(s, gold)["hit@1"] == 1.0
+
+
+def test_mrr_at_10_zera_quando_o_equivalente_passa_da_posicao_10():
+    gold = Gold(np.array([0, 1]), (np.array([5]), np.array([2])))
+    s = np.zeros((2, 14))
+    # consulta 0: o relevante (doc 5) fica na posicao 11; consulta 1: relevante em 1o
+    s[0, 1:12] = np.linspace(2.0, 1.0, 11)
+    s[0, 5] = 0.5
+    s[0, 12] = 0.4
+    s[1, 2] = 3.0
+    r = avaliar(s, gold)
+    assert r["hit@10"] == 0.5
+    assert r["mrr@10"] == 0.5  # (0 + 1) / 2
+    assert abs(r["mrr"] - (1 / 11 + 1) / 2) < 1e-9

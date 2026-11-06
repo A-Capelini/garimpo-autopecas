@@ -118,5 +118,5 @@ def test_colunas_compativeis_com_avaliacao_csv():
     tab = avaliar_niveis(catalogo_sintetico(), TfidfRetriever)
     assert list(tab.columns) == [
         "retriever", "nivel", "n_docs", "n_consultas", "hit@1", "hit@5", "hit@10",
-        "mrr", "seg_indexacao", "ms_por_consulta",
+        "mrr", "mrr@10", "seg_indexacao", "ms_por_consulta",
     ]

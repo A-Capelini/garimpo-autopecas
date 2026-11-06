@@ -15,7 +15,7 @@ def avaliar(
     """Avalia uma matriz de scores (n_consultas x n_documentos)."""
     n_q = scores.shape[0]
     if n_q == 0:
-        return {"n_consultas": 0, "mrr": float("nan"), **{f"hit@{k}": float("nan") for k in ks},
+        return {"n_consultas": 0, "mrr": float("nan"), "mrr@10": float("nan"), **{f"hit@{k}": float("nan") for k in ks},
                 **{f"recall@{k}": float("nan") for k in ks}}
 
     # Arredonda para que empates reais (descricoes repetidas -> vetores identicos) nao sejam
@@ -36,7 +36,11 @@ def avaliar(
         for k in ks:
             recall[k][i] = np.isin(ordem[i, :k], rel).sum() / len(rel)
 
-    resultado = {"n_consultas": int(n_q), "mrr": float(np.mean(1.0 / primeiro))}
+    resultado = {
+        "n_consultas": int(n_q),
+        "mrr": float(np.mean(1.0 / primeiro)),
+        "mrr@10": float(np.mean(np.where(primeiro <= 10, 1.0 / primeiro, 0.0))),
+    }
     for k in ks:
         resultado[f"hit@{k}"] = float(np.mean(primeiro <= k))
         resultado[f"recall@{k}"] = float(np.mean(recall[k]))

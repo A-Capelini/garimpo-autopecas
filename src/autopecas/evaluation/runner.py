@@ -20,7 +20,7 @@ from autopecas.evaluation.metrics import avaliar
 
 COLUNAS = [
     "retriever", "nivel", "n_docs", "n_consultas",
-    "hit@1", "hit@5", "hit@10", "mrr", "seg_indexacao", "ms_por_consulta",
+    "hit@1", "hit@5", "hit@10", "mrr", "mrr@10", "seg_indexacao", "ms_por_consulta",
 ]
 
 

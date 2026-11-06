@@ -16,7 +16,7 @@ def main() -> None:
     tab.to_csv(destino, index=False)
     for nivel in ("Intermediário", "Avançado"):
         print(f"\n== {nivel} ==")
-        sub = tab[tab["nivel"] == nivel][["normalizacao", "min_df", "sublinear_tf", "hit@1", "hit@5", "hit@10", "mrr"]]
+        sub = tab[tab["nivel"] == nivel][["normalizacao", "min_df", "sublinear_tf", "hit@1", "hit@5", "hit@10", "mrr", "mrr@10"]]
         print(sub.round(4).to_string(index=False))
     print(f"\nSalvo em {destino}")
 
