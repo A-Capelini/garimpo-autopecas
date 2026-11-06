@@ -8,3 +8,6 @@ resultados/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !resultados/.gitkeep
+
+*.xlsx
+*.zip
