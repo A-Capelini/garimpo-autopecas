@@ -11,3 +11,7 @@ resultados/*
 
 *.xlsx
 *.zip
+.venv/
+venv/
+*.db
+*.db-*
