@@ -43,6 +43,8 @@ from autopecas.evaluation.runner_texto import (
     acrescentar_csv,
     avaliar_perguntas,
     comparar_pareado,
+    metricas_por_tipo,
+    posicoes_por_pergunta,
     relatorio_revisao,
     tabela_de,
     tabela_legivel,
@@ -157,6 +159,18 @@ def _rodar_gabarito(args, df) -> None:
             print(f"  Δ {m}: {c[f'delta_{m}']:+.3f}  IC95% [{lo:+.3f}; {hi:+.3f}]")
         print("  (intervalo que contém 0 = diferença não conclusiva com este número de perguntas)")
 
+    por_tipo = metricas_por_tipo(resultados)
+    print("\nPor tipo de pergunta (descritivo: poucas perguntas por tipo, sem intervalo):")
+    for nome, g in por_tipo.groupby("retriever", sort=False):
+        print(f"  {nome}")
+        print(g.drop(columns=["retriever", "nivel"]).round(3).to_string(index=False).replace("\n", "\n  "))
+    posicoes = posicoes_por_pergunta(resultados)
+    colunas = [r.linha["retriever"] for r in resultados]
+    ruins = posicoes[(posicoes[colunas] > 1).any(axis=1)]
+    print(f"\nPerguntas em que algum recuperador não acertou em 1º lugar ({len(ruins)} de {len(posicoes)}); "
+          f"posição do 1º equivalente ({args.nivel} tem {tabela['n_docs'].iloc[0]} itens):")
+    print(ruins.to_string(index=False))
+
     # Rastreabilidade: cada linha do CSV aponta para a versao exata do gabarito que a gerou.
     sha = hashlib.sha256(args.gabarito.read_bytes()).hexdigest()[:12]
     print(f"\nGabarito: {args.gabarito} (sha256 {sha}…)")
@@ -169,6 +183,12 @@ def _rodar_gabarito(args, df) -> None:
     except ValueError as e:
         raise SystemExit(f"\nERRO: {e}")
     print(f"\nResultados acrescentados em {destino}")
+    por_tipo.insert(2, "gabarito_sha256", sha)
+    try:
+        acrescentar_csv(por_tipo, args.resultados / "avaliacao_texto_por_tipo.csv")
+    except ValueError as e:
+        raise SystemExit(f"\nERRO: {e}")
+    posicoes.to_csv(args.resultados / f"posicoes_{_slug(args.nivel)}.csv", index=False)  # so a ultima medicao
     for res in resultados:
         caminho = args.resultados / f"revisao_{_slug(args.nivel)}_{_slug(res.linha['retriever'])}.md"
         caminho.write_text(relatorio_revisao(res, perguntas), encoding="utf-8")

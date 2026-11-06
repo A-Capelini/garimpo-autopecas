@@ -306,3 +306,37 @@ def test_script_todos_mede_lexical_semantico_e_hibrido_e_imprime_diferenca_parea
     assert lido["retriever"].tolist() == ["tfidf-char", "ollama:bge-m3", "hibrido-rrf[3:1,k=1,d=50]"]
     assert (lido["n_consultas"] == 3).all() and (lido["normalizacao"] == "simples").all()
     assert len(list((tmp_path / "res").glob("revisao_basico_*.md"))) == 3
+    assert "Por tipo de pergunta" in saida and "Perguntas em que algum recuperador" in saida
+    por_tipo = pd.read_csv(tmp_path / "res" / "avaliacao_texto_por_tipo.csv")
+    assert set(por_tipo["retriever"]) == set(lido["retriever"]) and "gabarito_sha256" in por_tipo.columns
+    pos = pd.read_csv(tmp_path / "res" / "posicoes_basico.csv")
+    assert pos["id"].tolist() == ["Q1", "Q2", "Q3"] and "tfidf-char" in pos.columns
+
+
+# ---------------------------------------------------------------- por tipo e por pergunta
+def test_posicoes_por_pergunta_e_metricas_por_tipo():
+    from autopecas.evaluation.runner_texto import metricas_por_tipo, posicoes_por_pergunta
+
+    lex = avaliar_perguntas(catalogo(), perguntas(), TfidfRetriever)
+    hib = avaliar_perguntas(catalogo(), perguntas(), _hibrido)
+    pos = posicoes_por_pergunta([lex, hib])
+    assert pos["id"].tolist() == ["Q1", "Q2", "Q3"]  # a sem_resposta (Q4) fica de fora
+    assert pos["tipo"].tolist() == ["direta", "coloquial", "direta"]
+    assert pos["tfidf-char"].tolist() == lex.posicoes.tolist()
+    assert list(pos.columns) == ["id", "pergunta", "tipo", "tfidf-char", hib.linha["retriever"]]
+
+    pt = metricas_por_tipo([lex, hib])
+    assert sorted(pt["tipo"].unique()) == ["coloquial", "direta"]
+    d = pt[(pt["retriever"] == "tfidf-char") & (pt["tipo"] == "direta")].iloc[0]
+    assert d["n_consultas"] == 2
+    assert d["hit@1"] == pytest.approx(np.mean(np.array([lex.posicoes[0], lex.posicoes[2]]) == 1))
+    assert pt["n_consultas"].sum() == 2 * 3  # 3 perguntas medidas, em 2 recuperadores
+
+
+def test_posicoes_por_pergunta_recusa_gabaritos_diferentes():
+    from autopecas.evaluation.runner_texto import posicoes_por_pergunta
+
+    a = avaliar_perguntas(catalogo(), perguntas(), TfidfRetriever)
+    b = avaliar_perguntas(catalogo(), perguntas()[:2], TfidfRetriever)
+    with pytest.raises(ValueError, match="mesmo gabarito"):
+        posicoes_por_pergunta([a, b])

@@ -128,6 +128,42 @@ def comparar_pareado(pos_a: np.ndarray, pos_b: np.ndarray, n_boot: int = 2000) -
     return saida
 
 
+def posicoes_por_pergunta(resultados: list[ResultadoTexto]) -> pd.DataFrame:
+    """Posicao do 1o equivalente de cada pergunta COM resposta, uma coluna por recuperador.
+
+    Todos os resultados precisam ser do mesmo gabarito. Posicao n_docs+1 = fora da lista (sem evidencia).
+    """
+    base = resultados[0]
+    for r in resultados[1:]:
+        if r.ids_medidos != base.ids_medidos:
+            raise ValueError("os resultados precisam ser do mesmo gabarito")
+    com = base.gabarito.com_resposta
+    tab = pd.DataFrame({
+        "id": base.ids_medidos,
+        "pergunta": [t for t, c in zip(base.gabarito.perguntas, com) if c],
+        "tipo": [t for t, c in zip(base.gabarito.tipos, com) if c],
+    })
+    for r in resultados:
+        tab[r.linha["retriever"]] = r.posicoes
+    return tab
+
+
+def metricas_por_tipo(resultados: list[ResultadoTexto]) -> pd.DataFrame:
+    """Hit@1/5/10 e MRR por tipo de pergunta e recuperador. Descritivo: n por tipo e pequeno (sem IC)."""
+    pos = posicoes_por_pergunta(resultados)
+    linhas = []
+    for r in resultados:
+        nome = r.linha["retriever"]
+        for tipo, grupo in pos.groupby("tipo", sort=True):
+            p = grupo[nome].to_numpy()
+            linhas.append({
+                "retriever": nome, "nivel": r.linha["nivel"], "tipo": tipo, "n_consultas": len(p),
+                "hit@1": float(np.mean(p == 1)), "hit@5": float(np.mean(p <= 5)),
+                "hit@10": float(np.mean(p <= 10)), "mrr": float(np.mean(1.0 / p)),
+            })
+    return pd.DataFrame(linhas)
+
+
 # ---------------------------------------------------------------- arquivos
 def acrescentar_csv(tabela: pd.DataFrame, destino: Path | str) -> None:
     """Acrescenta ao CSV; se o arquivo ja existe com outro cabecalho, recusa (nao mistura colunas)."""
