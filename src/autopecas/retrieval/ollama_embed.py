@@ -1,6 +1,7 @@
 """Recuperador semantico via embeddings do Ollama (endpoint /api/embed).
 
-Cache por texto em SQLite (data/processed/embeddings.db): a chave e (modelo,
+Cache por texto em SQLite (padrao: data/processed/embeddings.db; com `banco=` o cache vive no
+mesmo arquivo do catalogo, data/catalogo.db): a chave e (modelo,
 hash do texto efetivamente enviado, ja com prefixo). Trocar 1 descricao
 reembeda so 1 texto; reindexar outro nivel reaproveita tudo.
 
@@ -13,6 +14,7 @@ import hashlib
 import os
 import sqlite3
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Sequence
@@ -23,6 +25,14 @@ import requests
 from autopecas.config import DADOS_PROCESSADOS
 
 NOME_BANCO = "embeddings.db"
+
+# DDL unico da tabela de vetores: o store do catalogo (store/catalogo.py) reutiliza esta
+# constante para que o cache possa viver no mesmo arquivo SQLite do catalogo.
+DDL_CACHE = (
+    "CREATE TABLE IF NOT EXISTS embeddings_cache ("
+    "modelo TEXT NOT NULL, texto_hash TEXT NOT NULL, vetor BLOB NOT NULL, "
+    "PRIMARY KEY (modelo, texto_hash))"
+)
 
 
 class ErroOllama(RuntimeError):
@@ -39,8 +49,11 @@ def _host_padrao() -> str:
     return bruto.replace("//0.0.0.0", "//127.0.0.1").rstrip("/")
 
 
-def _hash(texto: str) -> str:
+def hash_texto(texto: str) -> str:
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
+
+
+_hash = hash_texto  # nome antigo, mantido por compatibilidade
 
 
 class OllamaEmbeddingRetriever:
@@ -58,6 +71,7 @@ class OllamaEmbeddingRetriever:
         prefixo_consulta: str = "",
         cache_dir: Path | str = DADOS_PROCESSADOS,
         usar_cache: bool = True,
+        banco: Path | str | None = None,
         timeout: float = 600,
         sessao=None,
     ) -> None:
@@ -68,49 +82,55 @@ class OllamaEmbeddingRetriever:
         self.prefixo_documento = prefixo_documento
         self.prefixo_consulta = prefixo_consulta
         self.cache_dir = Path(cache_dir)
+        # `banco` (arquivo SQLite completo) tem prioridade sobre cache_dir/embeddings.db: permite
+        # guardar os vetores no mesmo arquivo do catalogo (decisao 26).
+        self.caminho_banco = Path(banco) if banco is not None else self.cache_dir / NOME_BANCO
         self.usar_cache = usar_cache
         self.timeout = timeout
         self.sessao = sessao or requests.Session()
         self.nome = f"ollama:{modelo}"
         self._E: np.ndarray | None = None
         self._conn: sqlite3.Connection | None = None
+        self._trava = threading.RLock()  # o app Streamlit pode chamar de threads diferentes
         self.chamadas_http = 0
 
     # ---------- cache ----------
     def _banco(self) -> sqlite3.Connection:
         if self._conn is None:
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-            self._conn = sqlite3.connect(self.cache_dir / NOME_BANCO)
-            self._conn.execute(
-                "CREATE TABLE IF NOT EXISTS embeddings_cache ("
-                "modelo TEXT NOT NULL, texto_hash TEXT NOT NULL, vetor BLOB NOT NULL, "
-                "PRIMARY KEY (modelo, texto_hash))"
-            )
+            self.caminho_banco.parent.mkdir(parents=True, exist_ok=True)
+            self._conn = sqlite3.connect(self.caminho_banco, check_same_thread=False)
+            self._conn.execute(DDL_CACHE)
             self._conn.commit()
         return self._conn
 
+    def hash_documento(self, texto: str) -> str:
+        """Hash da chave de cache de um documento (texto ja com o prefixo de documento)."""
+        return hash_texto(self.prefixo_documento + texto)
+
     def _ler_cache(self, hashes: list[str]) -> dict[str, np.ndarray]:
         achados: dict[str, np.ndarray] = {}
-        conn = self._banco()
-        for i in range(0, len(hashes), 500):  # limite de variaveis do SQLite
-            parte = hashes[i : i + 500]
-            marcas = ",".join("?" * len(parte))
-            cur = conn.execute(
-                f"SELECT texto_hash, vetor FROM embeddings_cache "
-                f"WHERE modelo = ? AND texto_hash IN ({marcas})",
-                [self.modelo, *parte],
-            )
-            for h, blob in cur:
-                achados[h] = np.frombuffer(blob, dtype=np.float32)
+        with self._trava:
+            conn = self._banco()
+            for i in range(0, len(hashes), 500):  # limite de variaveis do SQLite
+                parte = hashes[i : i + 500]
+                marcas = ",".join("?" * len(parte))
+                cur = conn.execute(
+                    f"SELECT texto_hash, vetor FROM embeddings_cache "
+                    f"WHERE modelo = ? AND texto_hash IN ({marcas})",
+                    [self.modelo, *parte],
+                )
+                for h, blob in cur:
+                    achados[h] = np.frombuffer(blob, dtype=np.float32)
         return achados
 
     def _gravar_cache(self, pares: list[tuple[str, np.ndarray]]) -> None:
-        conn = self._banco()
-        conn.executemany(
-            "INSERT OR REPLACE INTO embeddings_cache (modelo, texto_hash, vetor) VALUES (?, ?, ?)",
-            [(self.modelo, h, v.astype(np.float32).tobytes()) for h, v in pares],
-        )
-        conn.commit()
+        with self._trava:
+            conn = self._banco()
+            conn.executemany(
+                "INSERT OR REPLACE INTO embeddings_cache (modelo, texto_hash, vetor) VALUES (?, ?, ?)",
+                [(self.modelo, h, v.astype(np.float32).tobytes()) for h, v in pares],
+            )
+            conn.commit()
 
     # ---------- HTTP ----------
     def _post_embed(self, textos: list[str]) -> list[list[float]]:
@@ -180,6 +200,7 @@ class OllamaEmbeddingRetriever:
         return Q @ self._E.T
 
     def fechar(self) -> None:
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
+        with self._trava:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None

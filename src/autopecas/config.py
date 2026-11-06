@@ -9,6 +9,11 @@ RESULTADOS = RAIZ / "resultados"
 ARQUIVO_XLSX = DADOS_BRUTOS / "BD_Proj_Integrador_5CD.xlsx"
 CATALOGO_CSV = DADOS_PROCESSADOS / "catalogo.csv"
 
+# Catalogo vivo da loja (SQLite): pecas + vetores no mesmo arquivo. Fica em data/ (e nao em
+# processed/) porque, ao contrario do catalogo.csv, nao e regeneravel so com a planilha:
+# guarda o estado atual do estoque de ofertas. Fora do Git (*.db no .gitignore).
+CATALOGO_DB = RAIZ / "data" / "catalogo.db"
+
 # A planilha original NAO tem cabecalho: esta e a ordem das colunas A-F.
 COLUNAS = ["codigo_interno", "gtin", "descricao", "preco", "ncm", "fornecedor"]
 
