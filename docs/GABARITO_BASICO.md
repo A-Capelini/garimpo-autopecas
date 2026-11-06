@@ -7,6 +7,31 @@ comportamento com texto livre (as medições anteriores usam itens do catálogo 
 
 **Meta:** pelo menos **30 perguntas com resposta** (o critério da Etapa 3). Faixa recomendada: 30 a 50.
 
+## Rascunho inicial (apoio de IA) e revisão do grupo
+
+O primeiro conjunto foi **rascunhado com apoio de IA (Claude)**: 48 perguntas, sendo 44 com resposta e 4 `sem_resposta`.
+Elas saem do inventário do catálogo do Básico (famílias de peças, veículos citados, abreviações e jargão de balcão) e
+cobrem os tipos `direta` (14), `coloquial` (9), `sem_veiculo` (12), `por_codigo` (4), `erro_digitacao` (5) e `sem_resposta` (4).
+As peças esperadas foram achadas por **filtro exaustivo de palavras-chave na planilha, sem rodar o ranking do sistema**, para o
+gabarito não se ajustar ao que o sistema acerta. Em `autor` consta `rascunho-IA (Claude)`.
+
+**Só vale como gabarito depois da revisão humana.** Cada integrante confere cerca de 10 perguntas na planilha de conferência
+(`Serve? S/N` por peça; peças que faltam; peça existe ou não nas `sem_resposta`), aplica as correções no CSV e anota em
+`observacao` quem revisou. Se a revisão derrubar perguntas, **reponha com perguntas reais de balcão** (as do grupo valem
+mais que as sintéticas), mantendo o total entre 30 e 50 com resposta.
+
+**Critério de rotulagem (vale para todas):**
+- pergunta **com veículo**: só entram peças cuja descrição cita aquele veículo; item genérico, sem veículo, **não entra**
+  (compatibilidade não confirmada é "sugestão a validar", nunca "serve");
+- pergunta **sem veículo**: entram todos os itens daquela peça, de qualquer fornecedor A a D;
+- sem lado na pergunta, LD e LE servem; com lado, só o pedido;
+- peça parecida mas diferente não entra (coifa ≠ junta homocinética; tampa ≠ reservatório; bucha da bieleta ≠ bieleta).
+
+**Para o relatório (limites):** perguntas escritas por modelo de linguagem tendem a ser mais "limpas" que as de clientes
+reais; os tipos `coloquial` e `erro_digitacao` mitigam, mas não substituem perguntas reais. No Básico, só os
+fornecedores A e C citam veículo (B e D descrevem a peça sem veículo), então perguntas com veículo só têm resposta em A e C.
+Declare no relatório que o rascunho teve apoio de IA e foi conferido pelo grupo.
+
 ## Onde fica o arquivo (sigilo)
 
 `data/raw/gabarito_basico.csv` — **fora do Git** (a pasta `data/raw/` é ignorada), porque aponta
