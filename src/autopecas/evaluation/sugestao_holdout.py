@@ -302,6 +302,9 @@ def gabarito_de_conferencia(
             continue
         if not revisor:
             pendencias.append(f"{id_}: candidata {cod} sem o nome de quem revisou")
+        elif "rascunho" in revisor.lower():
+            pendencias.append(f"{id_}: candidata {cod} ainda é rascunho de IA; um integrante precisa confirmar "
+                              "e trocar `revisor` pelo próprio nome (decisão 36)")
         else:
             revisores[id_].add(revisor)
         if serve == "S":

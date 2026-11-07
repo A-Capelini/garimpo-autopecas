@@ -195,6 +195,12 @@ def test_fechamento_por_nivel_ignora_fornecedores_de_fora_inclusive_pendencias()
     assert inter.set_index("id").loc["H01", "pecas"] == "A:001|F:F9"
 
 
+def test_rascunho_de_ia_nao_fecha_o_gabarito_sem_confirmacao_humana():
+    rev = revisadas(("H01", "A", "001", "S", "rascunho-IA (Claude)"))
+    _, pend = gabarito_de_conferencia(perguntas(), rev)
+    assert len(pend) == 1 and "rascunho de IA" in pend[0]
+
+
 def test_aceita_s_minusculo():
     gab, pend = gabarito_de_conferencia(perguntas(), revisadas(("H01", "A", "001", "s", "Ana")))
     assert pend == [] and gab.set_index("id").loc["H01", "pecas"] == "A:001"
