@@ -7,7 +7,7 @@ from __future__ import annotations
 import streamlit as st
 
 from autopecas.search import Filtros
-from comum import atualizar_status, aviso_catalogo_vazio, carregar
+from comum import atualizar_status, aviso_catalogo_vazio, carregar, secao_resumo
 
 EXEMPLOS = ["cabo capo uno", "palheta s435", "filtro oleo gol", "amortecedor dianteiro fusca"]
 
@@ -105,6 +105,10 @@ st.dataframe(
     hide_index=True,
     column_config={"Preço (R$)": st.column_config.NumberColumn(format="%.2f")},
 )
+
+# ---------- resumo dos primeiros itens (por regras; IA local opcional) ----------
+chave_resumo = (consulta, tuple(fornecedores), tuple(categorias), faixa, n_resultados)
+secao_resumo(consulta, resultado.itens, chave_resumo)
 
 # ---------- mesmo produto em outros fornecedores ----------
 gtins = [g for g in tabela["gtin_chave"].dropna().unique() if g in itens_por_gtin]

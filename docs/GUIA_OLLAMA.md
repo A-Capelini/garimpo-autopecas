@@ -39,12 +39,13 @@ ollama rm <modelo>     # apaga
 | Uso | Modelo | Situação |
 |---|---|---|
 | Embeddings | `bge-m3` (568M, multilíngue) | decidido; vetores guardados em `data/catalogo.db` |
-| LLM (explicação) | candidatos `gemma3:1b`, `qwen3:1.7b`, `llama3.2:3b`, `gemma3:4b` | Etapa 5, ainda não escolhido; confira nomes em https://ollama.com/library |
+| LLM (resumo em linguagem natural) | `llama3.2:3b`, experimental e desligado por padrão | decisão 59: o resumo padrão é por regras (`autopecas.resumo`); medições na seção 9 |
 
 ## 6. Desempenho (i5-4690K, 16 GB, sem GPU)
 - Indexar o catálogo inteiro com `bge-m3`: ≈10 min, uma vez. Depois, atualizar 100 itens novos
   levou ≈8 s (82 vetores novos) — medido em `resultados/medicao_atualizacao.md`.
 - Consulta nova no app ≈ 30 ms de busca (+ ≈125 ms para vetorizar o texto da consulta na primeira vez).
+- Pico ocasional de ≈ 3,3 s numa consulta inédita (2 ocorrências, no script e no app; 3 consultas inéditas seguintes levaram 24 a 38 ms). Causa não confirmada; acima da meta de 1 s.
 
 ## 7. Vetores e cache
 Vetores ficam na tabela `embeddings_cache` do `data/catalogo.db`, chaveados por modelo + hash do
@@ -56,7 +57,37 @@ curl http://127.0.0.1:11434/api/embed -d '{"model":"bge-m3","input":["pastilha d
 ```
 Use `/api/embed` (a rota `/api/embeddings` é antiga).
 
-## 9. Problemas comuns
+## 9. LLM local (Etapa 5)
+Medido em 07/11/2026 no PC de referência (i5-4690K, 4 núcleos, sem GPU), com o `bge-m3` carregado, 12 consultas
+reais do tipo balcão e o caminho real do app (`Buscador` + `llm`; não inclui o desenho da tela do Streamlit).
+
+**Decisão 59 (por delegação; o grupo pode vetar):** o resumo padrão do app é **por regras** (`autopecas.resumo`):
+fornecedor, código, descrição na íntegra, preço e a situação do veículo que a própria busca calcula. O LLM é um
+complemento **experimental, desligado por padrão**, com o `llama3.2:3b` e o prompt `c`. O `gemma3:1b` saiu do app.
+
+| Modelo e prompt | Resultado nas 12 consultas (lista na mão, conferida na tela do app) |
+|---|---|
+| `gemma3:1b`, prompt `c` | 8 de 12 respostas com problema (afirma ou sugere que serve sem base, troca peça, funde preços); a guarda de texto bloqueou 0 |
+| `llama3.2:3b`, prompt `c` | recusou 6 de 12; nas 6 consultas conferidas na tela, só 1 estava correta (as recusas de palheta, filtro de óleo, jogo de juntas e cabo de freio eram indevidas; errou o veículo em "retrovisor") |
+
+Tempos do prompt `c` (modelo já carregado): `gemma3:1b` 1ª palavra 1,2 s (máx. 1,7 s), total 5,5 s (máx. 6,5 s),
+19,7 tok/s; `llama3.2:3b` 1ª palavra 2,8 s (máx. 3,4 s), total 5,9 s (máx. 13,2 s), 7,5 tok/s. A frio:
+`gemma3:1b` 7,8 s e `llama3.2:3b` 22,6 s até a primeira palavra (31,7 s no total, acima das metas de 10 s e 30 s),
+por isso o app carrega o modelo ao ligar o resumo por IA.
+
+Causa de fundo: a busca devolve itens que casam por palavra mas são outra peça (suporte de cabo, coxim,
+guarda-pó) e os modelos pequenos não sabem dizer qual peça cada item é; a guarda só vê palavras ("compatível",
+"serve") e não pega frases como "é a peça solicitada". Por isso o resumo por regras reproduz a descrição sem
+parafrasear. Modelos `gemma3:4b` (lento, usa swap), `qwen3.5` e `gemma4` (tamanho) foram descartados; `lfm3`
+exige Ollama mais novo que o disponível no conda-forge (0.32.15).
+
+Para medir de novo (um modelo por vez, `ollama pull <modelo>` antes):
+```bash
+python scripts/12_medir_llm.py --modelos llama3.2:3b gemma3:1b --prompt c --rotulo minha_medicao
+```
+Saídas em `resultados/` (fora do Git; contêm descrições e preços reais do catálogo).
+
+## 10. Problemas comuns
 | Sintoma | O que fazer |
 |---|---|
 | App em "🔴 offline" | `ollama serve`; `curl .../api/tags`; `ollama list` deve mostrar `bge-m3` |

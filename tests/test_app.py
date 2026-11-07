@@ -2,6 +2,7 @@
 
 Rodam sem Ollama: o buscador abre em modo lexical, que e o plano B da apresentacao.
 """
+import json
 import sys
 from pathlib import Path
 
@@ -221,3 +222,169 @@ def test_pagina_adaptacoes_recusa_ano_invalido(app_env):
     at.selectbox[0].set_value("uno")
     at.text_input[1].set_value("88").run()
     assert any("Ano inválido" in e.value for e in at.error)
+
+
+# ---------------------------------------------------------------- resumo dos primeiros itens (Etapa 5)
+
+
+def _expander_llm(at):
+    return next(e for e in at.expander if "IA local" in e.label)
+
+
+def test_home_mostra_resumo_por_regras_sem_ollama(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(HOME, default_timeout=60).run()
+    at.text_input(key="consulta").set_value("cabo capo uno").run()
+    assert not at.exception
+    assert any(s.value == "Resumo dos primeiros itens" for s in at.subheader)
+    corpo = " ".join(m.value for m in at.markdown)
+    assert "**A · 1**" in corpo and "CABO CAPO UNO" in corpo
+    assert "R\\$ 16,00" in corpo  # cifrao escapado: nao vira LaTeX
+    assert any("sem IA" in c.value for c in at.caption)
+    assert any("Experimental" in c.value for c in at.caption)
+
+
+def test_resumo_nao_aparece_quando_nao_ha_resultado(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(HOME, default_timeout=60).run()
+    at.text_input(key="consulta").set_value("zzzzzz qqqqq").run()
+    assert not at.exception
+    assert not any(s.value == "Resumo dos primeiros itens" for s in at.subheader)
+
+
+def test_ligar_ia_com_ollama_parado_avisa_e_mantem_lista_e_resumo(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(HOME, default_timeout=60).run()
+    at.text_input(key="consulta").set_value("cabo capo uno").run()
+    at.toggle(key="llm_ativo").set_value(True).run()
+    assert not at.exception
+    assert any("Ollama está parado" in w.value for w in at.warning)
+    assert not any(b.key == "btn_llm" for b in at.button)  # sem modelo/servidor, nao oferece o botao
+    assert len(at.dataframe) >= 1 and any("**A · 1**" in m.value for m in at.markdown)
+
+
+class _RespFalsa:
+    status_code = 200
+
+    def __init__(self, textos, final=None):
+        self.linhas = [json.dumps({"message": {"role": "assistant", "content": t}, "done": False}) for t in textos]
+        self.linhas.append(json.dumps(final or {
+            "message": {"content": ""}, "done": True, "total_duration": 4_000_000_000,
+            "prompt_eval_count": 200, "prompt_eval_duration": 1_000_000_000,
+            "eval_count": 40, "eval_duration": 2_000_000_000,
+        }))
+
+    def iter_lines(self):
+        yield from self.linhas
+
+    def close(self):
+        pass
+
+
+class _SessaoLLM:
+    def __init__(self, resp):
+        self.resp = resp
+
+    def post(self, url, json=None, timeout=None, stream=False):
+        return self.resp
+
+
+def _ligar_llm(monkeypatch, comum, textos=None, resp=None):
+    """Liga o toggle sem Ollama real: modelo 'instalado', aquecimento ok, geracao pela sessao falsa."""
+    llm = comum.llm
+    monkeypatch.setattr(llm, "modelo_disponivel", lambda *a, **k: True)
+    monkeypatch.setattr(llm, "aquecer_modelo", lambda *a, **k: True)
+    resposta = resp or _RespFalsa(textos)
+    original = llm.explicar
+    monkeypatch.setattr(llm, "explicar", lambda c, i, **kw: original(c, i, sessao=_SessaoLLM(resposta), host="http://x:1", **kw))
+
+
+def _abrir_e_gerar(caminho, consulta="cabo capo uno"):
+    at = AppTest.from_file(HOME, default_timeout=60).run()
+    at.text_input(key="consulta").set_value(consulta).run()
+    at.toggle(key="llm_ativo").set_value(True).run()
+    at.button(key="btn_llm").click().run()
+    return at
+
+
+def test_resumo_por_ia_liberado_mostra_texto_aviso_e_tempos(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, ["O [A:1] por R$ 16,00 cita o Uno.", " Confira o ano."])
+    at = _abrir_e_gerar(caminho)
+    assert not at.exception
+    corpo = " ".join(m.value for m in at.markdown)
+    assert "O \\[A:1\\] por R\\$ 16,00 cita o Uno. Confira o ano." in corpo
+    legendas = " ".join(c.value for c in at.caption)
+    assert "Resumo gerado por IA local" in legendas and "tok/s" in legendas
+
+
+def test_resumo_por_ia_com_afirmacao_e_bloqueado_e_o_texto_nao_aparece(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, ["O item é compatível com o veículo."])
+    at = _abrir_e_gerar(caminho)
+    assert not at.exception
+    assert any("bloqueou este resumo" in w.value for w in at.warning)
+    assert "compatível com o veículo" not in " ".join(m.value for m in at.markdown)
+
+
+def test_resumo_por_ia_com_codigo_inventado_e_bloqueado(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, ["O [Z:99999] por R$ 5,00 cita o Uno."])
+    at = _abrir_e_gerar(caminho)
+    assert any("bloqueou este resumo" in w.value for w in at.warning)
+
+
+def test_resumo_por_ia_cortado_no_teto_fica_na_ultima_frase(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    cortado = {"message": {"content": ""}, "done": True, "done_reason": "length", "eval_count": 120, "eval_duration": 6_000_000_000}
+    _ligar_llm(monkeypatch, comum, resp=_RespFalsa(["O [A:1] cita o Uno, por R$ 16,00. O [B:2] é gen"], final=cortado))
+    at = _abrir_e_gerar(caminho)
+    corpo = " ".join(m.value for m in at.markdown)
+    assert "por R\\$ 16,00." in corpo and "é gen" not in corpo
+
+
+def test_resumo_por_ia_falha_do_ollama_nao_derruba_a_tela(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, resp=_RespFalsa([], final={"error": "x"}))
+    at = _abrir_e_gerar(caminho)
+    assert not at.exception
+    assert any("continuam disponíveis" in w.value for w in at.warning)
+    assert len(at.dataframe) >= 1
+
+
+def test_resumo_por_ia_e_mantido_ao_mexer_em_outro_controle(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, ["O [A:1] cita o Uno."])
+    at = _abrir_e_gerar(caminho)
+    assert any("cita o Uno" in m.value for m in at.markdown)
+    at.run()  # nova execucao sem clicar: o texto guardado continua para a mesma consulta e filtros
+    assert any("cita o Uno" in m.value for m in at.markdown)
+    at.text_input(key="consulta").set_value("filtro oleo gol").run()  # outra consulta: o resumo antigo some
+    assert not any("cita o Uno" in m.value for m in at.markdown)
+
+
+def test_recusa_da_ia_mostra_nota_de_que_pode_estar_errada(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, ["Não encontrei o cabo de capô entre os itens da lista."])
+    at = _abrir_e_gerar(caminho)
+    assert not at.exception
+    assert any("pode estar errado" in i.value for i in at.info)
+    assert any("Não encontrei o cabo" in m.value for m in at.markdown)  # o texto e a nota aparecem juntos
+
+
+def test_resposta_normal_da_ia_nao_mostra_a_nota_de_recusa(app_env, monkeypatch):
+    caminho, comum = app_env
+    popular(caminho)
+    _ligar_llm(monkeypatch, comum, ["O [A:1] cita o Uno, por R$ 16,00."])
+    at = _abrir_e_gerar(caminho)
+    assert not any("pode estar errado" in i.value for i in at.info)
