@@ -22,14 +22,19 @@ src/autopecas/
   data/                  loader.py · quality.py (GTIN, texto de busca) · levels.py
   retrieval/             lexical.py (TF-IDF) · ollama_embed.py (bge-m3 + cache) · hybrid.py (RRF)
   store/                 catalogo.py (SQLite, upsert, vetores) · medicao.py (custo de atualizar)
-  search.py              Buscador: filtros, híbrida/lexical, equivalentes por GTIN
+  search.py              Buscador: filtros, híbrida/lexical, equivalentes por GTIN, ordenação por veículo
+  veiculos.py            extração de veículo e ano (campos derivados em memória) · família pelo catálogo
+  adaptacoes.py          modo Adaptações: blocos rotulados, sempre "sugestão a validar"
+  retrieval/veiculo.py   regra de camadas por veículo (mesma função no app e na avaliação)
   evaluation/            gold.py (gabarito por GTIN) · metrics.py (Hit@k, Recall@k, MRR, IC95%)
                          gabarito_texto.py + runner_texto.py (gabarito manual em texto livre)
 app/Home.py              busca, filtros, status do Ollama, equivalentes por GTIN
 app/pages/1_Atualizar_catalogo.py   envio da planilha, prévia e aplicação
-scripts/                 01 preparar · 02 avaliar · 03 ablação · 04 calibrar · 06 importar · 07 medir · 09 gabarito
+app/pages/2_Adaptacoes.py           peça + veículo (+ ano): citado, família, genérico; sempre a validar
+scripts/                 01 preparar · 02 avaliar · 03 ablação · 04 calibrar · 06 importar · 07 medir · 09 gabarito · 10 veículo
 docs/GUIA_OLLAMA.md      Ollama neste projeto
 docs/GABARITO_BASICO.md  como o grupo escreve e valida o gabarito manual do Básico
+docs/ADAPTACOES.md       modo Adaptações: regras, rótulos, limites e como medir
 data/raw/                coloque aqui BD_Proj_Integrador_5CD.xlsx (não versionado)
 data/processed/          catalogo.csv (gerado)
 data/catalogo.db         catálogo SQLite + vetores (gerado, não versionado)
@@ -86,6 +91,7 @@ Gabarito manual do Básico (perguntas em texto livre; veja `docs/GABARITO_BASICO
 ```bash
 python scripts/02_avaliar.py --retriever lexical --gabarito data/raw/gabarito_basico.csv --so-validar
 bash scripts/09_medicao_etapa3.sh      # léxico, bge-m3 e híbrida; resultados/avaliacao_texto.csv
+python scripts/10_medir_veiculo.py     # Etapa 4: base x +veiculo (precisa do Ollama; --so-lexical não precisa)
 ```
 
 ## Problemas comuns
@@ -121,5 +127,5 @@ fases A e B). O histórico dele continua no Git.
 
 ## Próximos passos
 
-Etapa 3: gabarito Básico manual (código pronto; falta o grupo escrever as perguntas) · Etapa 4: modo Adaptações (veículo/ano) · Etapa 5: LLM local
+Etapa 3: gabarito Básico manual (código pronto; falta o grupo escrever as perguntas) · Etapa 4: modo Adaptações (código pronto; medição híbrida/bge-m3 depende do Ollama) · Etapa 5: LLM local
 para explicar o resultado · Etapa 6: avaliação final e relatório. P2: 18/11/2026.

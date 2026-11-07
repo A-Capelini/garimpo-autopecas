@@ -9,6 +9,10 @@ Diferencas em relacao ao app do Vitor (corrigidas aqui):
 - se o Ollama falhar (na carga ou no meio de uma consulta) o buscador degrada para lexical sem
   erro e `reconectar()` volta ao hibrido quando o servidor reaparece;
 - a consulta e normalizada com a mesma regra do `texto_busca` do catalogo.
+
+Etapa 4: se a consulta cita um veiculo conhecido, o topo do ranking e reordenado por camada (cita o
+veiculo / generico / outro veiculo; ver `retrieval/veiculo.py`) e cada item devolvido traz as colunas
+`camada` e `situacao_veiculo` (texto para a tela; vazio quando a consulta nao cita veiculo).
 """
 from __future__ import annotations
 
@@ -23,6 +27,9 @@ from autopecas.data.quality import MANTER_SIMBOLOS_NO_TEXTO_BUSCA, normalizar_te
 from autopecas.retrieval.hybrid import DECIMAIS_EMPATE, HybridRetriever
 from autopecas.retrieval.lexical import TfidfRetriever
 from autopecas.retrieval.ollama_embed import ErroOllama, OllamaEmbeddingRetriever
+from autopecas.retrieval.veiculo import PROFUNDIDADE as PROFUNDIDADE_VEICULO
+from autopecas.retrieval.veiculo import garantir_extracao, reordenar, situacao_do_item
+from autopecas.veiculos import ConsultaAnalisada, analisar_consulta
 
 PESO_LEXICAL = 3.0
 PESO_SEMANTICO = 1.0
@@ -60,6 +67,7 @@ class Resultado:
     itens: pd.DataFrame  # itens do catalogo + colunas `score` e `posicao`
     modo: str  # MODO_HIBRIDA ou MODO_LEXICAL
     latencia_ms: float
+    consulta: ConsultaAnalisada | None = None  # peca, veiculo e ano lidos da consulta
 
     def __len__(self) -> int:
         return len(self.itens)
@@ -70,7 +78,7 @@ class Buscador:
         """`itens`: itens ATIVOS do catalogo (Catalogo.itens()). `hibrido`: com fallback_lexical=True."""
         if not hibrido.fallback_lexical:
             raise ValueError("o Buscador exige HybridRetriever(fallback_lexical=True)")
-        self.itens = itens.reset_index(drop=True)
+        self.itens = garantir_extracao(itens).reset_index(drop=True)
         self.hibrido = hibrido
         self._textos = self.itens["texto_busca"].tolist()
         self.hibrido.fit(self._textos)
@@ -152,13 +160,16 @@ class Buscador:
         return True
 
     # ---------- busca ----------
-    def buscar(self, consulta: str, k: int = 20, filtros: Filtros | None = None) -> Resultado:
+    def buscar(
+        self, consulta: str, k: int = 20, filtros: Filtros | None = None, por_veiculo: bool = True
+    ) -> Resultado:
         inicio = time.perf_counter()
+        analisada = analisar_consulta(consulta)
         q = normalizar_texto(consulta, manter_simbolos=MANTER_SIMBOLOS_NO_TEXTO_BUSCA)
         mascara = filtros.mascara(self.itens) if filtros else np.ones(len(self.itens), dtype=bool)
         idx = np.flatnonzero(mascara)
         if not q or len(idx) == 0:
-            return self._resultado(idx[:0], np.array([]), self.modo, inicio)
+            return self._resultado(idx[:0], np.array([]), self.modo, inicio, analisada)
 
         Sl = np.asarray(self.hibrido.lexical.score_texts([q]), dtype=np.float64)[:, idx]
         modo, score = MODO_LEXICAL, Sl[0]
@@ -172,15 +183,27 @@ class Buscador:
             except ErroOllama:
                 self.hibrido.degradado = True  # o proximo reconectar() tenta de novo
 
-        ordem = np.argsort(-np.round(score, DECIMAIS_EMPATE), kind="stable")[:k]
+        ordem = np.argsort(-np.round(score, DECIMAIS_EMPATE), kind="stable")
         ordem = ordem[score[ordem] > 0]  # score 0 = nenhuma evidencia: nao lista
-        return self._resultado(idx[ordem], score[ordem], modo, inicio)
+        if por_veiculo:
+            ordem = reordenar(ordem, self.itens.iloc[idx], analisada, PROFUNDIDADE_VEICULO)
+        ordem = ordem[:k]
+        return self._resultado(idx[ordem], score[ordem], modo, inicio, analisada)
 
-    def _resultado(self, posicoes: np.ndarray, scores: np.ndarray, modo: str, inicio: float) -> Resultado:
+    def _resultado(
+        self, posicoes: np.ndarray, scores: np.ndarray, modo: str, inicio: float,
+        consulta: ConsultaAnalisada | None = None,
+    ) -> Resultado:
         itens = self.itens.iloc[posicoes].copy()
         itens["score"] = scores
         itens["posicao"] = np.arange(1, len(itens) + 1)
-        return Resultado(itens.reset_index(drop=True), modo, (time.perf_counter() - inicio) * 1000)
+        situacoes = [
+            situacao_do_item(v, i, f, consulta) if consulta is not None else (1, "")
+            for v, i, f in zip(itens["veiculos"], itens["ano_ini"], itens["ano_fim"])
+        ]
+        itens["camada"] = [c for c, _ in situacoes]
+        itens["situacao_veiculo"] = [t for _, t in situacoes]
+        return Resultado(itens.reset_index(drop=True), modo, (time.perf_counter() - inicio) * 1000, consulta)
 
 
 def equivalentes_por_gtin(itens: pd.DataFrame) -> dict[str, pd.DataFrame]:

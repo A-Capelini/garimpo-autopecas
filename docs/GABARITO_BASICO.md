@@ -9,9 +9,9 @@ comportamento com texto livre (as medições anteriores usam itens do catálogo 
 
 ## Rascunho inicial (apoio de IA) e revisão do grupo
 
-O primeiro conjunto foi **rascunhado com apoio de IA (Claude)**: 48 perguntas, sendo 44 com resposta e 4 `sem_resposta`.
+O primeiro conjunto foi **rascunhado com apoio de IA (Claude)**: 49 perguntas, sendo 43 com resposta e 6 `sem_resposta` (Q15 e Q19 viraram `sem_resposta` pela decisão 38).
 Elas saem do inventário do catálogo do Básico (famílias de peças, veículos citados, abreviações e jargão de balcão) e
-cobrem os tipos `direta` (14), `coloquial` (9), `sem_veiculo` (12), `por_codigo` (4), `erro_digitacao` (5) e `sem_resposta` (4).
+cobrem os tipos `direta` (14), `coloquial` (7), `sem_veiculo` (13), `por_codigo` (4), `erro_digitacao` (5) e `sem_resposta` (6).
 As peças esperadas foram achadas por **filtro exaustivo de palavras-chave na planilha, sem rodar o ranking do sistema**, para o
 gabarito não se ajustar ao que o sistema acerta. Em `autor` consta `rascunho-IA (Claude)`.
 

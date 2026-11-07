@@ -54,6 +54,7 @@ for coluna, exemplo in zip(st.columns(len(EXEMPLOS)), EXEMPLOS):
     coluna.button(exemplo, on_click=lambda e=exemplo: st.session_state.update(consulta=e))
 
 consulta = st.session_state.get("consulta", "").strip()
+st.session_state["_ultima_consulta"] = consulta  # a página Adaptações lê daqui (o estado do widget some ao trocar de página)
 if not consulta:
     st.info("Digite uma peça ou clique num exemplo acima.")
     st.stop()
@@ -76,15 +77,29 @@ if len(resultado) == 0:
     st.warning("Nenhuma peça encontrada com esses termos e filtros.")
     st.stop()
 
+lida = resultado.consulta
+tem_veiculo = lida is not None and lida.tem_veiculo
+if tem_veiculo:
+    ano_txt = f", ano {lida.ano}" if lida.ano else ""
+    st.caption(
+        f"Veículo lido da consulta: {', '.join(lida.veiculos)}{ano_txt}. Itens que citam o veículo e a peça vêm primeiro; "
+        "os demais seguem a relevância e mostram na coluna **Veículo** o que a descrição diz. "
+        "Para ver sugestões de adaptação (sempre a validar), abra **Adaptações** no menu à esquerda."
+    )
+
 tabela = resultado.itens.copy()
 tabela["equivalentes"] = tabela["gtin_chave"].map(
     lambda g: len(itens_por_gtin[g]) - 1 if g in itens_por_gtin else 0
 )
+colunas = ["codigo_interno", "descricao", "fornecedor", "preco", "ncm", "gtin", "equivalentes"]
+if tem_veiculo:
+    colunas.insert(2, "situacao_veiculo")
 st.dataframe(
-    tabela[["codigo_interno", "descricao", "fornecedor", "preco", "ncm", "gtin", "equivalentes"]].rename(
+    tabela[colunas].rename(
         columns={
             "codigo_interno": "Código", "descricao": "Descrição", "fornecedor": "Fornecedor",
             "preco": "Preço (R$)", "ncm": "NCM", "gtin": "GTIN", "equivalentes": "Em outros fornecedores",
+            "situacao_veiculo": "Veículo",
         }
     ),
     hide_index=True,

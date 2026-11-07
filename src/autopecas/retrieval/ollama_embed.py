@@ -83,7 +83,7 @@ class OllamaEmbeddingRetriever:
         self.prefixo_consulta = prefixo_consulta
         self.cache_dir = Path(cache_dir)
         # `banco` (arquivo SQLite completo) tem prioridade sobre cache_dir/embeddings.db: permite
-        # guardar os vetores no mesmo arquivo do catalogo (decisao 26).
+        # guardar os vetores no mesmo arquivo do catalogo (decisao 28).
         self.caminho_banco = Path(banco) if banco is not None else self.cache_dir / NOME_BANCO
         self.usar_cache = usar_cache
         self.timeout = timeout

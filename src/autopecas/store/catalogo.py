@@ -1,7 +1,7 @@
 """Catalogo SQLite: fonte unica das pecas e, no mesmo arquivo, dos vetores de embedding.
 
 Decisoes (CONTEXTO, secao 6): chave (fornecedor, codigo_interno) (19); SQLite como catalogo
-unico, sem FTS5 (1); vetores no mesmo arquivo, chaveados por modelo + hash do texto (26).
+unico, sem FTS5 (1); vetores no mesmo arquivo, chaveados por modelo + hash do texto (28).
 
 Atualizacao (upsert): `importar` compara a entrada com o que ja esta gravado e so escreve o que
 mudou. Os vetores nao pertencem a uma linha, e sim a um texto (hash): item novo ou com

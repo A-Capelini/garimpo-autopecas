@@ -68,7 +68,12 @@ def avaliar_perguntas(
     gab = resolver(perguntas, df, nivel)
     r = fabrica()
     t0 = time.time()
-    r.fit(sub[coluna_texto].tolist())
+    if hasattr(r, "fit_itens"):  # recuperador que precisa dos campos do item (ex.: ComVeiculo)
+        if coluna_texto != "texto_busca":
+            raise ValueError("a ordenação por veículo só vale sobre o campo texto_busca")
+        r.fit_itens(sub)
+    else:
+        r.fit(sub[coluna_texto].tolist())
     t_fit = time.time() - t0
 
     t1 = time.time()

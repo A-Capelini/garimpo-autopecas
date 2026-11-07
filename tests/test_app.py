@@ -17,6 +17,7 @@ from helpers import _Sessao, linha  # noqa: E402
 RAIZ = Path(__file__).resolve().parents[1]
 HOME = str(RAIZ / "app" / "Home.py")
 PAGINA = str(RAIZ / "app" / "pages" / "1_Atualizar_catalogo.py")
+ADAPTACOES = str(RAIZ / "app" / "pages" / "2_Adaptacoes.py")
 
 
 @pytest.fixture
@@ -169,3 +170,54 @@ def test_status_offline_mesmo_com_todos_os_vetores_em_cache(app_env):
     assert not any("online" in m.value and "offline" not in m.value for m in at.markdown)
     at.text_input(key="consulta").set_value("cabo capo uno").run()
     assert {m.label: m.value for m in at.metric}["Modo de busca"] == "lexical"
+
+
+def test_home_mostra_o_veiculo_lido_e_a_coluna_veiculo(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(HOME, default_timeout=60).run()
+    at.text_input(key="consulta").set_value("filtro oleo gol").run()
+    assert not at.exception
+    assert any("Veículo lido da consulta: gol" in c.value for c in at.caption)
+    assert "Veículo" in at.dataframe[0].value.columns
+    at.text_input(key="consulta").set_value("filtro oleo").run()  # sem veiculo: sem coluna
+    assert "Veículo" not in at.dataframe[0].value.columns
+
+
+def test_pagina_adaptacoes_sem_catalogo_e_sem_veiculo(app_env):
+    at = AppTest.from_file(ADAPTACOES, default_timeout=30).run()
+    assert not at.exception
+    assert any("catálogo ainda está vazio" in w.value for w in at.warning)
+
+
+def test_pagina_adaptacoes_exige_peca_e_veiculo_e_mostra_aviso(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(ADAPTACOES, default_timeout=60).run()
+    assert not at.exception
+    assert any("Confirme a aplicação" in i.value for i in at.info)   # aviso fixo
+    assert any("Informe a peça e escolha o veículo" in i.value for i in at.info)
+
+
+def test_pagina_adaptacoes_lista_blocos_rotulados(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(ADAPTACOES, default_timeout=60).run()
+    at.text_input[0].set_value("cabo capo")
+    at.selectbox[0].set_value("uno").run()
+    assert not at.exception
+    titulos = [s.value for s in at.subheader]
+    assert any(t.startswith("Citado na descrição do fornecedor") for t in titulos)
+    tabela = at.dataframe[0].value
+    assert set(tabela["Situação"]) <= {"citado na descrição do fornecedor", "sugestão a validar"}
+    assert "Motivo" in tabela.columns
+
+
+def test_pagina_adaptacoes_recusa_ano_invalido(app_env):
+    caminho, _ = app_env
+    popular(caminho)
+    at = AppTest.from_file(ADAPTACOES, default_timeout=60).run()
+    at.text_input[0].set_value("cabo capo")
+    at.selectbox[0].set_value("uno")
+    at.text_input[1].set_value("88").run()
+    assert any("Ano inválido" in e.value for e in at.error)
