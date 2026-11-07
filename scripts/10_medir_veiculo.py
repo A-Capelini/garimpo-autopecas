@@ -7,11 +7,17 @@ o que fica a frente da 1a peca esperada (hipotese do veiculo, CONTEXTO 5.5).
 Uso:
   python scripts/10_medir_veiculo.py                          # lexical, bge-m3 e hibrido (precisa do Ollama)
   python scripts/10_medir_veiculo.py --so-lexical             # sem Ollama
-  python scripts/10_medir_veiculo.py --gabarito outro.csv
+  python scripts/10_medir_veiculo.py --gabarito outro.csv --nivel "Intermediário" --rotulo holdout
+
+--rotulo: obrigatorio com outro gabarito ou outro nivel (evita sobrescrever os arquivos da Etapa 4). Acrescenta
+_<rotulo> aos nomes de saida e, para o holdout, confere que a regra de veiculo continua identica a tag etapa-4
+(src/autopecas/retrieval/veiculo.py e src/autopecas/veiculos.py) antes de medir. Sem --rotulo nada muda.
 
 Configuracao medida: a escolhida nas decisoes 21 a 23 (texto simples, min_df=1, RRF 3:1, k_rrf=1, prof. 50).
 Saidas em resultados/ (fora do Git): avaliacao_texto.csv e avaliacao_texto_por_tipo.csv (linhas novas,
-retriever '...+veiculo'), posicoes_basico_veiculo.csv, diagnostico_veiculo.csv, revisao_basico_*+veiculo.md.
+retriever '...+veiculo'), posicoes_basico_veiculo.csv, diagnostico_veiculo.csv, revisao_basico_*+veiculo.md
+(com --rotulo X: posicoes_<nivel>_veiculo_X.csv, diagnostico_veiculo_X.csv, revisao_<nivel>_*+veiculo_X.md).
+As linhas de avaliacao_texto*.csv se distinguem por gabarito_sha256 e nivel (o esquema do CSV nao muda).
 """
 import argparse
 import hashlib
@@ -23,6 +29,7 @@ from pathlib import Path
 from autopecas.config import CATALOGO_CSV, NIVEIS, RESULTADOS
 from autopecas.data.loader import carregar_catalogo
 from autopecas.data.quality import MANTER_SIMBOLOS_NO_TEXTO_BUSCA, normalizar_texto
+from autopecas.evaluation.congelamento import commit_atual, regra_congelada
 from autopecas.evaluation.diagnostico_veiculo import itens_a_frente, resumo
 from autopecas.evaluation.gabarito_texto import (
     ErroGabarito,
@@ -70,7 +77,23 @@ def main() -> None:
     ap.add_argument("--so-lexical", action="store_true", help="nao usa o Ollama (so o lexical, base e +veiculo)")
     ap.add_argument("--catalogo", type=Path, default=CATALOGO_CSV)
     ap.add_argument("--resultados", type=Path, default=RESULTADOS)
+    ap.add_argument("--rotulo", default="", help="sufixo das saidas (ex.: holdout); obrigatorio com outro gabarito/nivel")
+    ap.add_argument("--aceitar-regra-alterada", action="store_true",
+                    help="com --rotulo, mede mesmo se a regra de veiculo difere da tag etapa-4 (registre o motivo)")
     args = ap.parse_args()
+
+    padrao = args.gabarito == Path("data/raw/gabarito_basico.csv") and args.nivel == "Básico"
+    if not args.rotulo and not padrao:
+        raise SystemExit("\nOutro gabarito ou nível: passe --rotulo (ex.: --rotulo holdout) para não sobrescrever "
+                         "os arquivos da Etapa 4.")
+    sufixo = f"_{_slug(args.rotulo)}" if args.rotulo else ""
+    if args.rotulo:
+        raiz = Path(__file__).resolve().parent.parent
+        congelada, detalhe = regra_congelada(raiz)
+        print(f"Código: {commit_atual(raiz)} | regra de veículo: {detalhe}")
+        if not congelada and not args.aceitar_regra_alterada:
+            raise SystemExit("\nA regra de veículo não está idêntica à tag etapa-4; não meço o holdout assim. "
+                             "Volte a regra ao estado da tag ou use --aceitar-regra-alterada e registre o motivo.")
 
     df = carregar_catalogo(args.catalogo)
     df["texto_busca"] = df["descricao"].map(
@@ -82,8 +105,13 @@ def main() -> None:
     erros = validar_contra_catalogo(perguntas, df, args.nivel)
     if erros:
         raise SystemExit("\nGabarito não bate com o catálogo:\n" + "\n".join(f"- {e}" for e in erros))
-    for aviso in avisos_do_gabarito(perguntas):
-        print("AVISO:", aviso)
+    if args.rotulo:
+        n_com = sum(1 for p in perguntas if not p.sem_resposta)
+        print(f"Rótulo '{args.rotulo}': {n_com} pergunta(s) com resposta e {len(perguntas) - n_com} sem_resposta "
+              "(poucas perguntas: o IC95% será largo; leia diferença com intervalo que contém 0 como não conclusiva).")
+    else:
+        for aviso in avisos_do_gabarito(perguntas):
+            print("AVISO:", aviso)
     sha = hashlib.sha256(args.gabarito.read_bytes()).hexdigest()[:12]
 
     base, com = [], []
@@ -144,13 +172,15 @@ def main() -> None:
         acrescentar_csv(por_tipo, args.resultados / "avaliacao_texto_por_tipo.csv")
     except ValueError as e:
         raise SystemExit(f"\nERRO: {e}")
-    posicoes.to_csv(args.resultados / "posicoes_basico_veiculo.csv", index=False)
-    diag.to_csv(args.resultados / "diagnostico_veiculo.csv", index=False)
+    f_posicoes = f"posicoes_{_slug(args.nivel)}_veiculo{sufixo}.csv"
+    f_diag = f"diagnostico_veiculo{sufixo}.csv"
+    posicoes.to_csv(args.resultados / f_posicoes, index=False)
+    diag.to_csv(args.resultados / f_diag, index=False)
     for res in com:
-        caminho = args.resultados / f"revisao_{_slug(args.nivel)}_{_slug(res.linha['retriever'])}.md"
+        caminho = args.resultados / f"revisao_{_slug(args.nivel)}_{_slug(res.linha['retriever'])}{sufixo}.md"
         caminho.write_text(relatorio_revisao(res, perguntas), encoding="utf-8")
     print(f"\nResultados acrescentados em {args.resultados}/avaliacao_texto.csv (e _por_tipo); "
-          "posicoes_basico_veiculo.csv, diagnostico_veiculo.csv e revisao_*+veiculo.md gravados.")
+          f"{f_posicoes}, {f_diag} e revisao_{_slug(args.nivel)}_*+veiculo{sufixo}.md gravados.")
 
 
 if __name__ == "__main__":

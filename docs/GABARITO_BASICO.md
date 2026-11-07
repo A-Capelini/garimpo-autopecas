@@ -15,7 +15,9 @@ cobrem os tipos `direta` (14), `coloquial` (7), `sem_veiculo` (13), `por_codigo`
 As peças esperadas foram achadas por **filtro exaustivo de palavras-chave na planilha, sem rodar o ranking do sistema**, para o
 gabarito não se ajustar ao que o sistema acerta. Em `autor` consta `rascunho-IA (Claude)`.
 
-**Só vale como gabarito depois da revisão humana.** Cada integrante confere cerca de 10 perguntas na planilha de conferência
+**Status: revisão do grupo concluída** (registrada no Diário de Bordo). O arquivo medido nas Etapas 3 e 4 tem
+`gabarito_sha256` `fb41ead32ef2`; qualquer edição no CSV muda o hash e invalida as comparações. Regra que valeu
+enquanto durou a revisão: **só vale como gabarito depois da revisão humana.** Cada integrante confere cerca de 10 perguntas na planilha de conferência
 (`Serve? S/N` por peça; peças que faltam; peça existe ou não nas `sem_resposta`), aplica as correções no CSV e anota em
 `observacao` quem revisou. Se a revisão derrubar perguntas, **reponha com perguntas reais de balcão** (as do grupo valem
 mais que as sintéticas), mantendo o total entre 30 e 50 com resposta.
